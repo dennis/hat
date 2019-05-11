@@ -5,7 +5,6 @@ extern crate enum_primitive;
 
 use structopt::StructOpt;
 
-
 mod bluetooth;
 mod mibcs; // Mi Body Composition Scale
 
@@ -68,7 +67,7 @@ fn main() {
     let mut scanner = MIBCSScanner::new(&cli);
 
     match scanner.scan() {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(error) => {
             println!("ERROR: {:?}", error.message);
             std::process::exit(1);
@@ -83,8 +82,15 @@ mod test {
 
     #[test]
     fn decoding_test1() {
-        let data = [ 0x02, 0x01, 0x06, 0x03, 0x02, 0x1b, 0x18, 0x10, 0x16, 0x1b, 0x18, 0x02, 0xa6, 0xe3, 0x07, 0x05, 0x01, 0x16, 0x20, 0x2a, 0x96, 0x01, 0xb0, 0x4a ];
-        let scale_data = WeightData::parse("FF:FF:FF:FF:FF:FF", bluetooth::advertising_data::parse_ad(&data).as_slice()).unwrap();
+        let data = [
+            0x02, 0x01, 0x06, 0x03, 0x02, 0x1b, 0x18, 0x10, 0x16, 0x1b, 0x18, 0x02, 0xa6, 0xe3,
+            0x07, 0x05, 0x01, 0x16, 0x20, 0x2a, 0x96, 0x01, 0xb0, 0x4a,
+        ];
+        let scale_data = WeightData::parse(
+            "FF:FF:FF:FF:FF:FF",
+            bluetooth::advertising_data::parse_ad(&data).as_slice(),
+        )
+        .unwrap();
         scale_data.dump();
         assert!(scale_data.weight == 95.6);
         assert!(scale_data.impedance == 406);
@@ -97,8 +103,15 @@ mod test {
     #[test]
     fn decoding_test2() {
         // https://community.home-assistant.io/t/integrating-xiaomi-mi-scale/9972/81
-        let data = [ 0x02, 0x01, 0x06, 0x03, 0x02, 0x1b, 0x18, 0x10, 0x16, 0x1b, 0x18, 0x02, 0xa6, 0xe2, 0x07, 0x05, 0x15, 0x0a, 0x25, 0x1d, 0xf4, 0x01, 0x44, 0x3e];
-        let scale_data = WeightData::parse("FF:FF:FF:FF:FF:FF", bluetooth::advertising_data::parse_ad(&data).as_slice()).unwrap();
+        let data = [
+            0x02, 0x01, 0x06, 0x03, 0x02, 0x1b, 0x18, 0x10, 0x16, 0x1b, 0x18, 0x02, 0xa6, 0xe2,
+            0x07, 0x05, 0x15, 0x0a, 0x25, 0x1d, 0xf4, 0x01, 0x44, 0x3e,
+        ];
+        let scale_data = WeightData::parse(
+            "FF:FF:FF:FF:FF:FF",
+            bluetooth::advertising_data::parse_ad(&data).as_slice(),
+        )
+        .unwrap();
         scale_data.dump();
         assert!(scale_data.weight == 79.7);
         assert!(scale_data.impedance == 500);
@@ -107,8 +120,15 @@ mod test {
         assert!(scale_data.impedance_stabilized == true);
         assert!(scale_data.weight_stabilized == true);
 
-        let data = [ 0x02, 0x01, 0x06, 0x03, 0x02, 0x1b, 0x18, 0x10, 0x16, 0x1b, 0x18, 0x02, 0xa6, 0xe2, 0x07, 0x05, 0x18, 0x0c, 0x0d, 0x04, 0xd7, 0x01, 0x94, 0x3e ];
-        let scale_data = WeightData::parse("FF:FF:FF:FF:FF:FF", bluetooth::advertising_data::parse_ad(&data).as_slice()).unwrap();
+        let data = [
+            0x02, 0x01, 0x06, 0x03, 0x02, 0x1b, 0x18, 0x10, 0x16, 0x1b, 0x18, 0x02, 0xa6, 0xe2,
+            0x07, 0x05, 0x18, 0x0c, 0x0d, 0x04, 0xd7, 0x01, 0x94, 0x3e,
+        ];
+        let scale_data = WeightData::parse(
+            "FF:FF:FF:FF:FF:FF",
+            bluetooth::advertising_data::parse_ad(&data).as_slice(),
+        )
+        .unwrap();
         scale_data.dump();
         assert!(scale_data.weight == 80.1);
         assert!(scale_data.impedance == 471);

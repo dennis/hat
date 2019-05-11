@@ -53,23 +53,41 @@ impl std::string::ToString for Adtype {
     fn to_string(&self) -> String {
         match self {
             Adtype::Flags => "Flags",
-            Adtype::IncompleteListOf16bitServiceClassUUIDs =>"Incomplete List of 16-bit Service Class UUIDs",
-            Adtype::CompleteListof16BitServiceClassUUIDs => "Complete List of 16-bit Service Class UUIDs",
-            Adtype::IncompleteListof32BitServiceClassUUIDs => "Incomplete List of 32-bit Service Class UUIDs",
-            Adtype::CompleteListof32BitServiceClassUUIDs => "Complete List of 32-bit Service Class UUIDs",
-            Adtype::IncompleteListof128BitServiceClassUUIDs => "Incomplete List of 128-bit Service Class UUIDs",
-            Adtype::CompleteListof128BitServiceClassUUIDs => "Complete List of 128-bit Service Class UUIDs",
+            Adtype::IncompleteListOf16bitServiceClassUUIDs => {
+                "Incomplete List of 16-bit Service Class UUIDs"
+            }
+            Adtype::CompleteListof16BitServiceClassUUIDs => {
+                "Complete List of 16-bit Service Class UUIDs"
+            }
+            Adtype::IncompleteListof32BitServiceClassUUIDs => {
+                "Incomplete List of 32-bit Service Class UUIDs"
+            }
+            Adtype::CompleteListof32BitServiceClassUUIDs => {
+                "Complete List of 32-bit Service Class UUIDs"
+            }
+            Adtype::IncompleteListof128BitServiceClassUUIDs => {
+                "Incomplete List of 128-bit Service Class UUIDs"
+            }
+            Adtype::CompleteListof128BitServiceClassUUIDs => {
+                "Complete List of 128-bit Service Class UUIDs"
+            }
             Adtype::ShortenedLocalName => "Shortened Local Name",
             Adtype::CompleteLocalName => "Complete Local Name",
             Adtype::TxPowerLevel => "Tx Power Level",
             Adtype::ClassofDevice => "Class of Device",
             Adtype::SimplePairingHashC => "Simple Pairing Hash C/Simple Pairing Hash C-192",
-            Adtype::SimplePairingRandomizerR => "Simple Pairing Randomizer R/Simple Pairing Randomizer R-192",
+            Adtype::SimplePairingRandomizerR => {
+                "Simple Pairing Randomizer R/Simple Pairing Randomizer R-192"
+            }
             Adtype::DeviceID => "Device ID/Security Manager TK Value",
             Adtype::SecurityManagerOutofBandFlags => "Security Manager Out of Band Flags",
             Adtype::SlaveConnectionIntervalRange => "Slave Connection Interval Range",
-            Adtype::Listof16BitServiceSolicitationUUIDs => "List of 16-bit Service Solicitation UUIDs",
-            Adtype::Listof128BitServiceSolicitationUUIDs => "List of 128-bit Service Solicitation UUIDs",
+            Adtype::Listof16BitServiceSolicitationUUIDs => {
+                "List of 16-bit Service Solicitation UUIDs"
+            }
+            Adtype::Listof128BitServiceSolicitationUUIDs => {
+                "List of 128-bit Service Solicitation UUIDs"
+            }
             Adtype::ServiceData => "Service Data/Service Data - 16-bit UUID",
             Adtype::PublicTargetAddress => "Public Target Address",
             Adtype::RandomTargetAddress => "Random Target Address",
@@ -79,10 +97,14 @@ impl std::string::ToString for Adtype {
             Adtype::LERole => "LE Role",
             Adtype::SimplePairingHashC256 => "Simple Pairing Hash C-256",
             Adtype::SimplePairingRandomizerR256 => "Simple Pairing Randomizer R-256",
-            Adtype::ListOf32BitServiceSolicitationUUIDs => "List of 32-bit Service Solicitation UUIDs",
+            Adtype::ListOf32BitServiceSolicitationUUIDs => {
+                "List of 32-bit Service Solicitation UUIDs"
+            }
             Adtype::ServiceData32BitUUID => "Service Data - 32-bit UUID",
             Adtype::ServiceData128BitUUID => "Service Data - 128-bit UUID",
-            Adtype::LESecureConnectionsConfirmationValue => "LE Secure Connections Confirmation Value",
+            Adtype::LESecureConnectionsConfirmationValue => {
+                "LE Secure Connections Confirmation Value"
+            }
             Adtype::LESecureConnectionsRandomValue => "LE Secure Connections Random Value",
             Adtype::URI => "URI",
             Adtype::IndoorPositioning => "Indoor Positioning",
@@ -93,8 +115,9 @@ impl std::string::ToString for Adtype {
             Adtype::MeshMessage => "Mesh Message",
             Adtype::MeshBeacon => "Mesh Beacon",
             Adtype::ThreeDInformationData => "3D Information Data",
-            Adtype::ManufacturerSpecificData => "Manufacturer Specific Data"
-        }.to_string()
+            Adtype::ManufacturerSpecificData => "Manufacturer Specific Data",
+        }
+        .to_string()
     }
 }
 

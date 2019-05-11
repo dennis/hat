@@ -1,56 +1,65 @@
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::SystemTime;
 
 use btlepasvscan::Error as BtleError;
 
+use super::weight_data::WeightData;
 use crate::bluetooth;
-use super::weight_data::{ WeightData };
 use crate::Cli;
 
 pub struct Error {
-    pub message : String
+    pub message: String,
 }
 
 impl std::convert::From<std::io::Error> for Error {
-    fn from(error : std::io::Error) -> Error {
-        Error { message: error.to_string() }
+    fn from(error: std::io::Error) -> Error {
+        Error {
+            message: error.to_string(),
+        }
     }
 }
 
 impl std::convert::From<()> for Error {
-    fn from(_error : ()) -> Error {
+    fn from(_error: ()) -> Error {
         let last_err = std::io::Error::last_os_error();
 
-        Error { message: last_err.to_string() }
+        Error {
+            message: last_err.to_string(),
+        }
     }
 }
 
 impl std::convert::From<BtleError> for Error {
-    fn from(error : BtleError) -> Error {
-        Error { message: error.to_string() }
+    fn from(error: BtleError) -> Error {
+        Error {
+            message: error.to_string(),
+        }
     }
 }
 
 impl std::convert::From<std::str::Utf8Error> for Error {
-    fn from(error : std::str::Utf8Error) -> Error {
-        Error { message: error.to_string() }
+    fn from(error: std::str::Utf8Error) -> Error {
+        Error {
+            message: error.to_string(),
+        }
     }
 }
 
 impl std::convert::From<std::time::SystemTimeError> for Error {
-    fn from(error : std::time::SystemTimeError) -> Error {
-        Error { message: error.to_string() }
+    fn from(error: std::time::SystemTimeError) -> Error {
+        Error {
+            message: error.to_string(),
+        }
     }
 }
 
-
 pub struct MIBCSScanner<'t> {
-    cli : &'t Cli
+    cli: &'t Cli,
 }
 
 impl<'t> MIBCSScanner<'t> {
-    pub fn new(cli : &Cli) -> MIBCSScanner {
+    pub fn new(cli: &Cli) -> MIBCSScanner {
         MIBCSScanner { cli }
     }
 
@@ -68,7 +77,7 @@ impl<'t> MIBCSScanner<'t> {
                         break;
                     }
                 }
-                Err(_) => break
+                Err(_) => break,
             }
 
             if term.load(Ordering::Relaxed) {
@@ -85,7 +94,7 @@ impl<'t> MIBCSScanner<'t> {
         Ok(())
     }
 
-    fn handle_data(&mut self, data : &btlepasvscan::Data) -> Result<bool, Error> {
+    fn handle_data(&mut self, data: &btlepasvscan::Data) -> Result<bool, Error> {
         if self.cli.debug {
             print!("{:?} ", data.address);
             for b in data.buffer {
@@ -102,16 +111,13 @@ impl<'t> MIBCSScanner<'t> {
             }
         }
 
-        let wiscale_data =
-            match WeightData::parse(data.address.to_str()?, ads.as_slice()) {
-                Some(scale_data) => {
-                    scale_data.dump();
-                    true
-                },
-                None => {
-                    false
-                }
-            };
+        let wiscale_data = match WeightData::parse(data.address.to_str()?, ads.as_slice()) {
+            Some(scale_data) => {
+                scale_data.dump();
+                true
+            }
+            None => false,
+        };
 
         Ok(wiscale_data)
     }
