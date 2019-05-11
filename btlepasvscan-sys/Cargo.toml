@@ -1,0 +1,10 @@
+[package]
+name = "btlepasvscan-sys"
+version = "0.1.0"
+authors = ["pi"]
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.42.2"
+cc = "1.0"
