@@ -1,21 +1,34 @@
 use crate::bluetooth;
+use serde::Serialize;
 use std::time::SystemTime;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct WeightData {
     pub address: String,
+    #[serde(skip_serializing)]
     pub created_at: SystemTime,
+    #[serde(skip_serializing)]
     pub updated_at: SystemTime,
+    #[serde(skip_serializing)]
     pub status_updated_at: SystemTime,
+    #[serde(skip_serializing)]
     pub announced: bool,
+    #[serde(skip_serializing)]
     pub announcable: bool,
+
     pub weight: f32,
     pub impedance: u32,
+    #[serde(skip_serializing)]
     pub statusbits0: u8,
+    #[serde(skip_serializing)]
     pub statusbits1: u8,
-    pub got_impedance: bool,        // statusbits1, bit 1
-    pub got_weight: bool,           // statusbits1, bit 2
-    pub weight_stabilized: bool,    // statusbits1, bit 5
+    #[serde(skip_serializing)]
+    pub got_impedance: bool, // statusbits1, bit 1
+    #[serde(skip_serializing)]
+    pub got_weight: bool, // statusbits1, bit 2
+    #[serde(skip_serializing)]
+    pub weight_stabilized: bool, // statusbits1, bit 5
+    #[serde(skip_serializing)]
     pub impedance_stabilized: bool, // statusbits1, bit 7
 }
 

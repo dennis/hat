@@ -9,3 +9,5 @@ btlepasvscan = { path = "../btlepasvscan" }
 enum_primitive = "0.1.1"
 signal-hook = "0.1.9"
 structopt = "0.2.10"
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }

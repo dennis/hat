@@ -54,6 +54,14 @@ impl std::convert::From<std::time::SystemTimeError> for Error {
     }
 }
 
+impl std::convert::From<serde_json::error::Error> for Error {
+    fn from(_error: serde_json::error::Error) -> Error {
+        Error {
+            message: "cannot generate json".to_string(),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct MIBCSScanner<'t> {
     cli: &'t Cli,
@@ -122,11 +130,15 @@ impl<'t> MIBCSScanner<'t> {
             Some(scale_data) => {
                 match self.last_weight_data.as_mut() {
                     Some(previous) => {
+                        if self.cli.debug {
+                            scale_data.dump();
+                        }
+
                         previous.update(&scale_data, self.cli.debug);
 
                         if previous.announcable && !previous.announced {
-                            previous.dump();
                             previous.announced = true;
+                            println!("{}", serde_json::to_string(&previous)?);
                         }
                     }
                     None => self.last_weight_data = Some(scale_data.clone()),
