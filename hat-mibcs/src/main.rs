@@ -2,6 +2,7 @@ extern crate btlepasvscan;
 
 #[macro_use]
 extern crate enum_primitive;
+extern crate chrono;
 
 use structopt::StructOpt;
 

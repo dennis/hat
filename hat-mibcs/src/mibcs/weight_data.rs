@@ -1,21 +1,20 @@
 use crate::bluetooth;
+use chrono::prelude::*;
 use serde::Serialize;
-use std::time::SystemTime;
 
 #[derive(Clone, Serialize)]
 pub struct WeightData {
     pub address: String,
+    #[serde(with = "my_date_format", rename = "datetime")]
+    pub created_at: DateTime<Local>,
     #[serde(skip_serializing)]
-    pub created_at: SystemTime,
+    pub updated_at: DateTime<Local>,
     #[serde(skip_serializing)]
-    pub updated_at: SystemTime,
-    #[serde(skip_serializing)]
-    pub status_updated_at: SystemTime,
+    pub status_updated_at: DateTime<Local>,
     #[serde(skip_serializing)]
     pub announced: bool,
     #[serde(skip_serializing)]
     pub announcable: bool,
-
     pub weight: f32,
     pub impedance: u32,
     #[serde(skip_serializing)]
@@ -30,6 +29,21 @@ pub struct WeightData {
     pub weight_stabilized: bool, // statusbits1, bit 5
     #[serde(skip_serializing)]
     pub impedance_stabilized: bool, // statusbits1, bit 7
+}
+
+mod my_date_format {
+    use chrono::{DateTime, Local};
+    use serde::{self, Serializer};
+
+    const FORMAT: &'static str = "%Y-%m-%d %H:%M:%S";
+
+    pub fn serialize<S>(date: &DateTime<Local>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let s = format!("{}", date.format(FORMAT));
+        serializer.serialize_str(&s)
+    }
 }
 
 impl WeightData {
@@ -73,9 +87,9 @@ impl WeightData {
 
         Some(WeightData {
             address: address.to_string(),
-            created_at: SystemTime::now(),
-            updated_at: SystemTime::now(),
-            status_updated_at: SystemTime::now(),
+            created_at: Local::now(),
+            updated_at: Local::now(),
+            status_updated_at: Local::now(),
             announced: false,
             announcable: false,
             weight,
@@ -95,16 +109,20 @@ impl WeightData {
 
         // If we haven't received data from it for the last 5 seconds, it must
         // be a new measurement
-        if let Ok(elapsed) = self.updated_at.elapsed() {
-            if elapsed.as_secs() > 5 {
-                if debug {
-                    println!("elapsed = {:?} > 5 - resetting", elapsed.as_secs());
-                }
+        let elapsed = self
+            .updated_at
+            .signed_duration_since(Local::now())
+            .num_seconds();
 
-                self.announcable = false;
-                self.announced = false;
+        if elapsed > 5 {
+            if debug {
+                println!("elapsed = {:?} > 5 - resetting", elapsed);
             }
+
+            self.announcable = false;
+            self.announced = false;
         }
+
         // if the stabilized flags are turned off, then its are new measurement
         if self.weight_stabilized && !weight_data.weight_stabilized
             || self.impedance_stabilized && !weight_data.impedance_stabilized
@@ -118,7 +136,7 @@ impl WeightData {
         }
 
         // uptime timestamps
-        self.updated_at = SystemTime::now();
+        self.updated_at = Local::now();
 
         if self.statusbits0 != weight_data.statusbits0
             || self.statusbits1 != weight_data.statusbits1
@@ -132,13 +150,15 @@ impl WeightData {
             self.announcable = weight_data.weight_stabilized && weight_data.impedance_stabilized;
         } else if !self.announced && self.weight_stabilized {
             // We got weight_stabilized - but more than 5 seconds since last stausbits update
-            if let Ok(elapsed) = self.status_updated_at.elapsed() {
-                if debug {
-                    println!("time since last status update: {:?}", elapsed.as_secs());
-                }
-
-                self.announcable = elapsed.as_secs() > 5;
+            let elapsed = self
+                .status_updated_at
+                .signed_duration_since(Local::now())
+                .num_seconds();
+            if debug {
+                println!("time since last status update: {:?}", elapsed);
             }
+
+            self.announcable = elapsed > 5;
         }
 
         self.weight = weight_data.weight;
