@@ -1,7 +1,14 @@
 use crate::bluetooth;
+use std::time::SystemTime;
 
+#[derive(Clone)]
 pub struct WeightData {
     pub address: String,
+    pub created_at: SystemTime,
+    pub updated_at: SystemTime,
+    pub status_updated_at: SystemTime,
+    pub announced: bool,
+    pub announcable: bool,
     pub weight: f32,
     pub impedance: u32,
     pub statusbits0: u8,
@@ -53,6 +60,11 @@ impl WeightData {
 
         Some(WeightData {
             address: address.to_string(),
+            created_at: SystemTime::now(),
+            updated_at: SystemTime::now(),
+            status_updated_at: SystemTime::now(),
+            announced: false,
+            announcable: false,
             weight,
             impedance,
             statusbits0,
@@ -64,7 +76,69 @@ impl WeightData {
         })
     }
 
+    pub fn update(&mut self, weight_data: &WeightData, debug: bool) {
+        // This implementation assumes only one Mi Scale weight
+        assert!(self.address == weight_data.address);
+
+        // If we haven't received data from it for the last 5 seconds, it must
+        // be a new measurement
+        if let Ok(elapsed) = self.updated_at.elapsed() {
+            if elapsed.as_secs() > 5 {
+                if debug {
+                    println!("elapsed = {:?} > 5 - resetting", elapsed.as_secs());
+                }
+
+                self.announcable = false;
+                self.announced = false;
+            }
+        }
+        // if the stabilized flags are turned off, then its are new measurement
+        if self.weight_stabilized && !weight_data.weight_stabilized
+            || self.impedance_stabilized && !weight_data.impedance_stabilized
+        {
+            if debug {
+                println!("something became unstabilized, reset");
+            }
+
+            self.announcable = false;
+            self.announced = false;
+        }
+
+        // uptime timestamps
+        self.updated_at = SystemTime::now();
+
+        if self.statusbits0 != weight_data.statusbits0
+            || self.statusbits1 != weight_data.statusbits1
+        {
+            self.status_updated_at = self.updated_at;
+        }
+
+        // anything to announce?
+        if !self.announced {
+            // We got both weight_stabilized and impedance_stabilized - then announce it
+            self.announcable = weight_data.weight_stabilized && weight_data.impedance_stabilized;
+        } else if !self.announced && self.weight_stabilized {
+            // We got weight_stabilized - but more than 5 seconds since last stausbits update
+            if let Ok(elapsed) = self.status_updated_at.elapsed() {
+                if debug {
+                    println!("time since last status update: {:?}", elapsed.as_secs());
+                }
+
+                self.announcable = elapsed.as_secs() > 5;
+            }
+        }
+
+        self.weight = weight_data.weight;
+        self.impedance = weight_data.impedance;
+        self.statusbits0 = weight_data.statusbits0;
+        self.statusbits1 = weight_data.statusbits1;
+        self.got_impedance = weight_data.got_impedance;
+        self.got_weight = weight_data.got_weight;
+        self.weight_stabilized = weight_data.weight_stabilized;
+        self.impedance_stabilized = weight_data.impedance_stabilized;
+    }
+
     pub fn dump(&self) {
-        println!("{:?} weight={:?}, impedance={:?}, got_impedance={:?}, got_weight={:?}, impedance_stabilized={:?}, weight_stabilized={:?}, statusbits={:#010b} #{:#010b}", self.address, self.weight, self.impedance, self.got_impedance, self.got_weight, self.impedance_stabilized, self.weight_stabilized, self.statusbits0, self.statusbits1);
+        println!("{:?} created_at={:?}, updated_at={:?}, weight={:?}, impedance={:?}, got_impedance={:?}, got_weight={:?}, impedance_stabilized={:?}, weight_stabilized={:?}, statusbits={:#010b} #{:#010b}", self.address, self.created_at, self.updated_at, self.weight, self.impedance, self.got_impedance, self.got_weight, self.impedance_stabilized, self.weight_stabilized, self.statusbits0, self.statusbits1);
     }
 }

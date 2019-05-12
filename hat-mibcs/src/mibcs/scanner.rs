@@ -54,13 +54,20 @@ impl std::convert::From<std::time::SystemTimeError> for Error {
     }
 }
 
+#[derive(Clone)]
 pub struct MIBCSScanner<'t> {
     cli: &'t Cli,
+    last_weight_data: Option<WeightData>,
+    announced: bool,
 }
 
 impl<'t> MIBCSScanner<'t> {
     pub fn new(cli: &Cli) -> MIBCSScanner {
-        MIBCSScanner { cli }
+        MIBCSScanner {
+            cli,
+            last_weight_data: None,
+            announced: false,
+        }
     }
 
     pub fn scan(&mut self) -> Result<(), Error> {
@@ -113,7 +120,18 @@ impl<'t> MIBCSScanner<'t> {
 
         let wiscale_data = match WeightData::parse(data.address.to_str()?, ads.as_slice()) {
             Some(scale_data) => {
-                scale_data.dump();
+                match self.last_weight_data.as_mut() {
+                    Some(previous) => {
+                        previous.update(&scale_data, self.cli.debug);
+
+                        if previous.announcable && !previous.announced {
+                            previous.dump();
+                            previous.announced = true;
+                        }
+                    }
+                    None => self.last_weight_data = Some(scale_data.clone()),
+                }
+
                 true
             }
             None => false,
