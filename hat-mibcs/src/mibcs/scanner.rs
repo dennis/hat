@@ -127,24 +127,28 @@ impl<'t> MIBCSScanner<'t> {
         }
 
         let wiscale_data = match WeightData::parse(data.address.to_str()?, ads.as_slice()) {
-            Some(scale_data) => {
-                match self.last_weight_data.as_mut() {
-                    Some(previous) => {
-                        if self.cli.debug {
-                            scale_data.dump();
-                        }
+            Some(scale_data) => match self.last_weight_data.as_mut() {
+                Some(previous) => {
+                    let mut result = false;
 
-                        previous.update(&scale_data, self.cli.debug);
-
-                        if previous.announcable && !previous.announced {
-                            println!("{}", previous.announcement()?);
-                        }
+                    if self.cli.debug {
+                        scale_data.dump();
                     }
-                    None => self.last_weight_data = Some(scale_data.clone()),
-                }
 
-                true
-            }
+                    previous.update(&scale_data, self.cli.debug);
+
+                    if previous.announcable && !previous.announced {
+                        println!("{}", previous.announcement()?);
+                        result = true;
+                    }
+
+                    result
+                }
+                None => {
+                    self.last_weight_data = Some(scale_data.clone());
+                    false
+                }
+            },
             None => false,
         };
 
