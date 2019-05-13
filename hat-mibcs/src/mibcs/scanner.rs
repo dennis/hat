@@ -137,8 +137,7 @@ impl<'t> MIBCSScanner<'t> {
                         previous.update(&scale_data, self.cli.debug);
 
                         if previous.announcable && !previous.announced {
-                            previous.announced = true;
-                            println!("{}", serde_json::to_string(&previous)?);
+                            println!("{}", previous.announcement()?);
                         }
                     }
                     None => self.last_weight_data = Some(scale_data.clone()),

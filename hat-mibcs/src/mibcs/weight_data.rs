@@ -2,6 +2,16 @@ use crate::bluetooth;
 use chrono::prelude::*;
 use serde::Serialize;
 
+#[derive(Serialize)]
+pub struct WeightDataAnnouncement {
+    pub source: String,
+    pub address: String,
+    #[serde(with = "my_date_format")]
+    pub datetime: DateTime<Local>,
+    pub weight: Option<f32>,
+    pub impedance: Option<u32>,
+}
+
 #[derive(Clone, Serialize)]
 pub struct WeightData {
     pub address: String,
@@ -169,6 +179,27 @@ impl WeightData {
         self.got_weight = weight_data.got_weight;
         self.weight_stabilized = weight_data.weight_stabilized;
         self.impedance_stabilized = weight_data.impedance_stabilized;
+    }
+
+    pub fn announcement(&mut self) -> Result<String, serde_json::error::Error> {
+        let data = WeightDataAnnouncement {
+            source: "hat-mibcs".to_string(),
+            address: self.address.clone(),
+            datetime: self.created_at,
+            weight: if self.got_weight {
+                Some(self.weight)
+            } else {
+                None
+            },
+            impedance: if self.got_impedance {
+                Some(self.impedance)
+            } else {
+                None
+            },
+        };
+
+        self.announced = true;
+        Ok(serde_json::to_string(&data)?)
     }
 
     pub fn dump(&self) {
