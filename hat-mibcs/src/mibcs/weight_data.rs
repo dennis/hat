@@ -113,6 +113,12 @@ impl WeightData {
         })
     }
 
+    fn reset(&mut self) {
+        self.announcable = false;
+        self.announced = false;
+        self.created_at = Local::now();
+    }
+
     pub fn update(&mut self, weight_data: &WeightData, debug: bool) {
         // This implementation assumes only one Mi Scale weight
         assert!(self.address == weight_data.address);
@@ -129,8 +135,7 @@ impl WeightData {
                 println!("elapsed = {:?} > 5 - resetting", elapsed);
             }
 
-            self.announcable = false;
-            self.announced = false;
+            self.reset();
         }
 
         // if the stabilized flags are turned off, then its are new measurement
@@ -141,8 +146,7 @@ impl WeightData {
                 println!("something became unstabilized, reset");
             }
 
-            self.announcable = false;
-            self.announced = false;
+            self.reset();
         }
 
         // uptime timestamps
