@@ -33,7 +33,7 @@ If you want to integrate this with Home Assistant or OpenHab you can utilize
 MQTT. If you install mosquitto, you could pipe the output from `hat-mibcs`
 directly to `mosquitto_pub` like this:
 ```
-$ hat-mimcs -s 0 | mosquitto_pub -l -t "miscale"
+$ hat-mibcs -s 0 | mosquitto_pub -l -t "miscale"
 ```
 
 This will publish the measurements to MQTT under the `miscale` topic, where
