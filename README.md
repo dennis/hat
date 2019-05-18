@@ -38,6 +38,7 @@ $ hat-mibcs -s 0 | mosquitto_pub -l -t "miscale"
 This will publish the measurements to MQTT under the `miscale` topic, where
 Home Assistant, OpenHab or Node-Red can do further processing of data.
 
+<<<<<<< HEAD
 ## hat-miflora
 `hat-miflora` is a tool for reading data from Xiaomi Miflora sensor. It will
 connect and query all reachable Miflora sensor and output the data retrieved as
@@ -56,3 +57,32 @@ hat-miflora
 
 As with `hat-mibcs`, use `mosquitto_pub` to publish the json to MQTT.
 
+### Calculating water-%, bmi, bone mass, etc
+
+These values are calculated from weight, impedance, age, height and gender. For
+now, I don't have a proper solution, so I've added a small script that you can
+use as you see fit.
+
+First download the script. Open it up in a editor and modify it. You need to
+change the `sex`, `age` and `height` values in the top of the script.
+
+The script works like this. It will read JSON string on STDIN and output
+another JSON string on STDOUT. If possible, the output will include additional
+calculated values (if there is no impedance value, it cannot calculate these
+additional values, so in that case, it will merely output the same as it got)
+
+To test it, try:
+```
+$ echo '{"source":"hat-mibcs","address":"EF:FB:0D:B1:43:97","datetime":"2019-05-13 16:03:35","weight":95.4,"impedance":397}' | ./mibcs-enrich.py
+{"water_pct": 49.84432039119496, "weight": 95.4, "bone_mass_kg": 3.396256717804, "bmi": 29.119990232288394, "datetime": "2019-05-13 16:03:35", "source": "hat-mibcs", "body_fat_pct": 30.190027463312376, "muscle_kg": 63.202457082196, "address": "EF:FB:0D:B1:43:97", "impedance": 397, "visceral_fat": 22.646900000000002}
+```
+
+as you see, we now got `water_pct`, `bone_mass_kg`, `bmi`, `body_fat_pct`,
+`muscle_kg` and `visceral_fat`.
+
+To make it work with hat-mibcs, mosquitto we end up with:
+```
+$ hat-mibcs -s 0 | mibcs-enrich.py | mosquitto_pub -l -t "miscale"
+```
+
+Now everything should be published to MQTT.
