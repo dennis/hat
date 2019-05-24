@@ -99,10 +99,13 @@ impl<'t> MIBCSScanner<'t> {
                 break;
             }
 
-            let elapsed = now.elapsed()?;
 
-            if self.cli.duration > 0 && elapsed.as_secs() > self.cli.duration {
-                break;
+            if self.cli.duration > 0 {
+                let elapsed = now.elapsed()?;
+
+                if elapsed.as_secs() > self.cli.duration {
+                    break;
+                }
             }
         }
 
@@ -119,6 +122,12 @@ impl<'t> MIBCSScanner<'t> {
         }
 
         let ads = bluetooth::advertising_data::parse_ad(&data.buffer);
+
+        if ads.is_none() {
+            return Ok(false);
+        }
+
+        let ads = ads.unwrap();
 
         if self.cli.debug {
             for ad in ads.as_slice() {

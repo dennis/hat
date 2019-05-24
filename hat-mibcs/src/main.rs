@@ -89,7 +89,7 @@ mod test {
         ];
         let scale_data = WeightData::parse(
             "FF:FF:FF:FF:FF:FF",
-            bluetooth::advertising_data::parse_ad(&data).as_slice(),
+            bluetooth::advertising_data::parse_ad(&data).unwrap().as_slice(),
         )
         .unwrap();
         scale_data.dump();
@@ -110,7 +110,7 @@ mod test {
         ];
         let scale_data = WeightData::parse(
             "FF:FF:FF:FF:FF:FF",
-            bluetooth::advertising_data::parse_ad(&data).as_slice(),
+            bluetooth::advertising_data::parse_ad(&data).unwrap().as_slice(),
         )
         .unwrap();
         scale_data.dump();
@@ -127,7 +127,7 @@ mod test {
         ];
         let scale_data = WeightData::parse(
             "FF:FF:FF:FF:FF:FF",
-            bluetooth::advertising_data::parse_ad(&data).as_slice(),
+            bluetooth::advertising_data::parse_ad(&data).unwrap().as_slice(),
         )
         .unwrap();
         scale_data.dump();
