@@ -11,6 +11,7 @@ pub struct btlepasvscan_ctx {
     pub data: *mut u8,
     pub length: u32,
     pub error: u8,
+    pub scan: u8,
 }
 #[test]
 fn bindgen_test_layout_btlepasvscan_ctx() {
@@ -82,6 +83,16 @@ fn bindgen_test_layout_btlepasvscan_ctx() {
             stringify!(btlepasvscan_ctx),
             "::",
             stringify!(error)
+        )
+    );
+    assert_eq!(
+        unsafe { &(*(::std::ptr::null::<btlepasvscan_ctx>())).scan as *const _ as usize },
+        1541usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(btlepasvscan_ctx),
+            "::",
+            stringify!(scan)
         )
     );
 }
