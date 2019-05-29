@@ -12,6 +12,7 @@ pub enum Error {
     HciLeSetScanParameters,
     HciLeSetScanEnable,
     HciLeSetScanDisable,
+    Open,
 }
 
 impl ToString for Error {
@@ -37,7 +38,8 @@ impl ToString for Error {
                 "hci_le_set_scan_disable() ".to_string()
                     + &std::io::Error::last_os_error().to_string()
             }
-            Error::BadData => "Received unexpected BTLE data".to_string(),
+            Error::BadData => "Received unexpected BTLE data ".to_string(),
+            Error::Open => "open() ".to_string(),
         }
     }
 }
@@ -66,7 +68,18 @@ impl BtlePasvScan {
         if context.is_null() {
             Err(Error::Context)
         } else {
-            Ok(BtlePasvScan { context })
+            match unsafe { (*context).error } {
+                0 => Ok(BtlePasvScan { context }),
+                1 => Err(Error::Recv),
+                2 => Err(Error::BadData),
+                3 => Err(Error::SetSockOpt),
+                4 => Err(Error::Bind),
+                5 => Err(Error::HciLeSetScanParameters),
+                6 => Err(Error::HciLeSetScanEnable),
+                7 => Err(Error::HciLeSetScanDisable),
+                8 => Err(Error::Open),
+                _ => Err(Error::Context)
+            }
         }
     }
 
