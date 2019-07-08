@@ -12,6 +12,8 @@ use structopt::StructOpt;
 mod bluetooth;
 mod mibcs; // Mi Body Composition Scale
 
+mod dbus_adapter;
+
 use std::boxed::Box;
 use std::error::Error;
 use std::io::Cursor;
