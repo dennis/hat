@@ -1,3 +1,6 @@
+extern crate dbus;
+extern crate byteorder;
+
 extern crate btlepasvscan;
 
 #[macro_use]
@@ -9,7 +12,24 @@ use structopt::StructOpt;
 mod bluetooth;
 mod mibcs; // Mi Body Composition Scale
 
+use std::boxed::Box;
+use std::error::Error;
+use std::io::Cursor;
+use dbus::{Connection, ConnectionItem, BusType, SignalArgs, Message, MessageItem};
+use dbus::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
+use dbus::MessageType::Signal;
+use byteorder::{LittleEndian, ReadBytesExt};
+use chrono::prelude::*;
+use serde::Serialize;
+
 use mibcs::scanner::MIBCSScanner;
+
+static SERVICE_NAME: &'static str = "org.bluez";
+static ADAPTER_INTERFACE: &'static str = "org.bluez.Adapter1";
+static DEVICE_NAME: &'static str = "org.bluez.Device1";
+
+static BODY_COMPOSITION_UUID: &'static str = "0000181b-0000-1000-8000-00805f9b34fb";
+
 // data from bluetooth scan will look like:
 // length: 1
 //   type: 1 "Flags"
@@ -63,79 +83,242 @@ pub struct Cli {
     duration: u64,
 }
 
-fn main() {
-    let cli = Cli::from_args();
-    let mut scanner = MIBCSScanner::new(&cli);
+#[derive(Debug)]
+pub enum AppError {
+    DecodeError,
+    JsonSerializationError
+}
 
-    match scanner.scan() {
-        Ok(_) => {}
-        Err(error) => {
-            println!("ERROR: {:?}", error.message);
-            std::process::exit(1);
-        }
+#[derive(Clone, Serialize)]
+pub struct WeightData {
+    pub address: String,
+    #[serde(with = "my_date_format", rename = "datetime")]
+    pub created_at: DateTime<Local>,
+    pub weight: Option<f32>,
+    pub impedance: Option<u16>,
+}
+
+mod my_date_format {
+    use chrono::{DateTime, Local};
+    use serde::{self, Serializer};
+
+    const FORMAT: &'static str = "%Y-%m-%d %H:%M:%S";
+
+    pub fn serialize<S>(date: &DateTime<Local>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let s = format!("{}", date.format(FORMAT));
+        serializer.serialize_str(&s)
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use mibcs::weight_data::WeightData;
+type AppResult = Result<(), Box<AppError>>;
 
-    #[test]
-    fn decoding_test1() {
-        let data = [
-            0x02, 0x01, 0x06, 0x03, 0x02, 0x1b, 0x18, 0x10, 0x16, 0x1b, 0x18, 0x02, 0xa6, 0xe3,
-            0x07, 0x05, 0x01, 0x16, 0x20, 0x2a, 0x96, 0x01, 0xb0, 0x4a,
-        ];
-        let scale_data = WeightData::parse(
-            "FF:FF:FF:FF:FF:FF",
-            bluetooth::advertising_data::parse_ad(&data).unwrap().as_slice(),
-        )
-        .unwrap();
-        scale_data.dump();
-        assert!(scale_data.weight == 95.6);
-        assert!(scale_data.impedance == 406);
-        assert!(scale_data.got_impedance == true);
-        assert!(scale_data.got_weight == true);
-        assert!(scale_data.impedance_stabilized == true);
-        assert!(scale_data.weight_stabilized == true);
+impl std::convert::From<std::io::Error> for Box<AppError> {
+    fn from(_error: std::io::Error) -> Box<AppError> {
+        Box::new(AppError::DecodeError)
+    }
+}
+
+impl std::convert::From<serde_json::error::Error> for Box<AppError> {
+    fn from(_error: serde_json::error::Error) -> Box<AppError> {
+        Box::new(AppError::JsonSerializationError)
+    }
+}
+
+fn decode_mibcs_data(value : &Vec<u8>) -> AppResult {
+    let mut rdr      = Cursor::new(value.clone());
+
+    let statusbit0  = rdr.read_u8()?;
+    let statusbis1  = rdr.read_u8()?;
+    let year  = rdr.read_u16::<LittleEndian>()?;
+    let month  = rdr.read_u8()?;
+    let day  = rdr.read_u8()?;
+    let hh  = rdr.read_u8()?;
+    let mm  = rdr.read_u8()?;
+    let ss  = rdr.read_u8()?;
+    let impedance  = rdr.read_u16::<LittleEndian>()?;
+    let weight  = rdr.read_u16::<LittleEndian>()? as f32 * 0.01 / 2.0;
+
+    // 0b001010010000000010
+    let got_impedance: bool = statusbis1 & 0b00000010 != 0;
+    let got_weight: bool = statusbis1 & 0b00000100 != 0;
+    let weight_stabilized: bool = statusbis1 & 0b00100000 != 0;
+    let impedance_stabilized: bool = statusbis1 & 0b10000000 != 0;
+
+    // println!(" statusbit0 = {:#010b}", statusbit0);
+    // println!(" statusbis1 = {:#010b}", statusbis1);
+    // println!(" year = {:?}", year);
+    // println!(" month = {:?}", month);
+    // println!(" day = {:?}", day);
+    // println!(" hh = {:?}", hh);
+    // println!(" mm = {:?}", mm);
+    // println!(" ss = {:?}", ss);
+    // println!(" impedance = {:?}", impedance);
+    // println!(" weight = {:?}", weight);
+    // println!(" got_impedance = {:?}", got_impedance);
+    // println!(" got_weight = {:?}", got_weight);
+    // println!(" weight_stabilized = {:?}", weight_stabilized);
+    // println!(" impedance_stabilized = {:?}", impedance_stabilized);
+
+    let weight = if weight_stabilized { Some(weight) } else {  None };
+    let impedance = if impedance_stabilized { Some(impedance) } else {  None };
+
+    let data = WeightData {
+        address: "??".to_string(),
+        created_at: Local::now(),
+        weight,
+        impedance
+    };
+
+    println!("{}", serde_json::to_string(&data)?);
+
+    Ok(())
+}
+
+fn extract_body_composition(key : &dbus::MessageItem, value : &dbus::MessageItem) -> Option<AppResult> {
+    if let dbus::MessageItem::Str(key) = key {
+        println!("  uuid : {:?}", key);
+
+        if key != BODY_COMPOSITION_UUID {
+            return None;
+        }
+
+        if let dbus::MessageItem::Variant(value) = value {
+            let value : &dbus::MessageItem = value;
+            if let dbus::MessageItem::Array(value) = value {
+
+                let bytes = value.as_ref().to_vec().into_iter().filter_map(|x| x.inner::<u8>().ok()).collect();
+
+                return Some(decode_mibcs_data(&bytes))
+            }
+        }
     }
 
-    #[test]
-    fn decoding_test2() {
-        // https://community.home-assistant.io/t/integrating-xiaomi-mi-scale/9972/81
-        let data = [
-            0x02, 0x01, 0x06, 0x03, 0x02, 0x1b, 0x18, 0x10, 0x16, 0x1b, 0x18, 0x02, 0xa6, 0xe2,
-            0x07, 0x05, 0x15, 0x0a, 0x25, 0x1d, 0xf4, 0x01, 0x44, 0x3e,
-        ];
-        let scale_data = WeightData::parse(
-            "FF:FF:FF:FF:FF:FF",
-            bluetooth::advertising_data::parse_ad(&data).unwrap().as_slice(),
-        )
-        .unwrap();
-        scale_data.dump();
-        assert!(scale_data.weight == 79.7);
-        assert!(scale_data.impedance == 500);
-        assert!(scale_data.got_impedance == true);
-        assert!(scale_data.got_weight == true);
-        assert!(scale_data.impedance_stabilized == true);
-        assert!(scale_data.weight_stabilized == true);
+    None
+}
 
-        let data = [
-            0x02, 0x01, 0x06, 0x03, 0x02, 0x1b, 0x18, 0x10, 0x16, 0x1b, 0x18, 0x02, 0xa6, 0xe2,
-            0x07, 0x05, 0x18, 0x0c, 0x0d, 0x04, 0xd7, 0x01, 0x94, 0x3e,
-        ];
-        let scale_data = WeightData::parse(
-            "FF:FF:FF:FF:FF:FF",
-            bluetooth::advertising_data::parse_ad(&data).unwrap().as_slice(),
-        )
-        .unwrap();
-        scale_data.dump();
-        assert!(scale_data.weight == 80.1);
-        assert!(scale_data.impedance == 471);
-        assert!(scale_data.got_impedance == true);
-        assert!(scale_data.got_weight == true);
-        assert!(scale_data.impedance_stabilized == true);
-        assert!(scale_data.weight_stabilized == true);
+fn inquiry_service_data_values(value : &dbus::MessageItem) -> Option<AppResult>  {
+    if let dbus::MessageItem::Array(value) = value {
+        for v in value.as_ref() {
+            if let dbus::MessageItem::DictEntry(key, value) = v {
+                return extract_body_composition(&key, &value);
+            }
+        }
+    }
+
+    None
+}
+
+fn inquiry_service_data(key : &dbus::MessageItem, value : &dbus::MessageItem) -> Option<AppResult> {
+    if let dbus::MessageItem::Str(key) = key {
+        println!("  {:?}", key);
+        if key == "ServiceData" {
+            println!("  Got service data!");
+
+            if let dbus::MessageItem::Variant(value) = value {
+                return inquiry_service_data_values(value);
+            }
+        }
+    }
+
+    None
+}
+
+fn inquiry_changed_properties(connection : &Connection, path : &String, item_vec : Vec<dbus::MessageItem>) -> Option<AppResult> {
+    // get property
+    //
+    // dbus-send --print-reply --type=method_call --system --dest=org.bluez
+    // /org/bluez/hci0/dev_EF_FB_0D_B1_43_97 org.freedesktop.DBus.Properties.Get
+    // string:org.bluez.Device1 string:Address
+
+    let mut m = Message::new_method_call(SERVICE_NAME, path, "org.freedesktop.DBus.Properties", "Get").unwrap();
+    m.append_items(&[
+        MessageItem::Str("org.bluez.Device1".to_string()), // interface
+        MessageItem::Str("Address".to_string()), // name
+    ]);
+    println!(" get address: {:?}", connection.send_with_reply_and_block(m, 1000).unwrap().get_items());
+
+    let mut m = Message::new_method_call(SERVICE_NAME, path, "org.freedesktop.DBus.Properties", "Get").unwrap();
+    m.append_items(&[
+        MessageItem::Str("org.bluez.Device1".to_string()), // interface
+        MessageItem::Str("UUIDs".to_string()), // name
+    ]);
+
+    // get uuids: [Variant(Array(MessageItemArray { v:
+    // [Str("00001530-0000-3512-2118-0009af100700"), Str("00001800-0000-1000-8000-00805f9b34fb"),
+    // Str("00001801-0000-1000-8000-00805f9b34fb"), Str("0000180a-0000-1000-8000-00805f9b34fb"),
+    // Str("0000181b-0000-1000-8000-00805f9b34fb")], sig: Signature("as") }))]
+    //
+
+    println!(" get uuids: {:?}", connection.send_with_reply_and_block(m, 1000).unwrap().get_items()[0]);
+
+    for item in item_vec {
+        println!("  - {:?}", item);
+
+        if let dbus::MessageItem::DictEntry(key, value) = item {
+            return inquiry_service_data(&key, &value);
+        }
+    }
+
+    None
+}
+
+fn listen_for_signals(connection : &Connection) -> Result<(), Box<Error>> {
+    let ppc = PropertiesPropertiesChanged::match_str(None, None);
+    println!("{:?}", ppc);
+
+    let m = Message::new_method_call(SERVICE_NAME, "/org/bluez/hci0", ADAPTER_INTERFACE, "StartDiscovery")?;
+    connection.send_with_reply_and_block(m, 1000)?;
+
+    connection.add_match(&ppc);
+
+    for n in connection.iter(5000) {
+        match n {
+            ConnectionItem::Signal(signal) => {
+                let (message_type, path, interface, member) =  signal.headers();
+
+                if message_type == Signal && interface == Some("org.freedesktop.DBus.Properties".to_string()) && member == Some("PropertiesChanged".to_string()) {
+                    let items = signal.get_items();
+
+                    if items[0] == dbus::MessageItem::Str("org.bluez.Device1".to_string()) {
+                        println!(" ********* ");
+
+                        if let dbus::MessageItem::Array(e) = &items[1] {
+                            let result = inquiry_changed_properties(&connection, &path.unwrap(), e.to_vec());
+
+                            if result.is_some() {
+                                match result.unwrap() {
+                                    Ok(_) => println!("Got data"),
+                                    Err(err) => println!("got problem {:?}", err)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            _ => ()
+        }
+    }
+
+    Ok(())
+}
+
+fn scan_for_mibcs() -> Result<(), Box<Error>> {
+    let connection = Connection::get_private(BusType::System)?;
+
+    listen_for_signals(&connection)?;
+
+    Ok(())
+}
+
+
+fn main() {
+    match scan_for_mibcs() {
+        Ok(_) => {}
+        Err(error) => {
+            println!("ERROR: {:?}", error);
+        }
     }
 }
