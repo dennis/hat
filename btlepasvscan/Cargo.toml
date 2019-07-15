@@ -1,8 +1,0 @@
-[package]
-name = "btlepasvscan"
-version = "0.2.0"
-authors = ["Dennis Møllegaard Pedersen <dennis@moellegaard.dk>"]
-edition = "2018"
-
-[dependencies]
-btlepasvscan-sys = { path = "../btlepasvscan-sys" }
