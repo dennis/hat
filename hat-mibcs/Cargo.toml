@@ -1,6 +1,6 @@
 [package]
 name = "hat-mibcs"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Dennis Møllegaard Pedersen <dennis@moellegaard.dk>"]
 edition = "2018"
 
