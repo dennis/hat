@@ -164,68 +164,53 @@ impl<'a> Scanner<'a> {
         item_vec: Vec<dbus::MessageItem>,
     ) -> Result<Option<WeightData>, Box<Error>> {
         let device = self.connection.with_path(SERVICE_NAME, path, 1000);
-        let properties = device.get_all(DEVICE_INTERFACE);
+        let properties = device.get_all(DEVICE_INTERFACE)?;
 
-        if let Ok(properties) = properties {
-            let btaddr = properties.get("Address");
-            let name = properties.get("Name");
-            let uuids = properties.get("UUIDs");
+        let btaddr = if let Some(btaddr) = properties.get("Address") { btaddr } else { return Ok(None) };
+        let name   = if let Some(name)   = properties.get("Name")    { name }   else { return Ok(None) };
+        let uuids  = if let Some(uuids)  = properties.get("UUIDs")   { uuids }  else { return Ok(None) };
 
-            if btaddr.is_none() || name.is_none() || uuids.is_none() {
+        if self.cli.debug {
+            eprintln!("changed properties:");
+            eprintln!("  btaddr {:?}", btaddr);
+            eprintln!("  name   {:?}", name);
+            eprintln!("  uuids  {:?}", uuids);
+        }
+
+        if let dbus::arg::Variant(uuids) = uuids {
+            let iter = (*uuids).as_iter();
+
+            if iter.is_none() {
                 return Ok(None);
             }
 
-            let btaddr = btaddr.unwrap();
-            let name = name.unwrap();
-            let uuids = uuids.unwrap();
+            let mut iter = iter.unwrap();
 
-            if self.cli.debug {
-                eprintln!("changed properties:");
-                eprintln!("  btaddr {:?}", btaddr);
-                eprintln!("  name   {:?}", name);
-                eprintln!("  uuids  {:?}", uuids);
-            }
+            if !iter.any(|a| a.as_str() == Some(BODY_COMPOSITION_UUID)) {
+                if self.cli.debug { eprintln!("  discarding due to missing uuid"); }
 
-            if let dbus::arg::Variant(uuids) = uuids {
-                let iter = (*uuids).as_iter();
-
-                if iter.is_none() {
-                    return Ok(None);
-                }
-
-                let mut iter = iter.unwrap();
-
-                if !iter.any(|a| a.as_str() == Some(BODY_COMPOSITION_UUID))
-                {
-                    if self.cli.debug {
-                        eprintln!("  discarding due to missing uuid");
-                    }
-
-                    return Ok(None);
-                }
-                if self.cli.debug {
-                    eprintln!("  found correct UUID");
-                }
-            } else {
-                if self.cli.debug {
-                    eprintln!("  discarding - wrong type");
-                }
                 return Ok(None);
             }
+        }
+        else {
+            if self.cli.debug { eprintln!("  discarding - wrong type"); }
 
+            return Ok(None);
+        }
+
+        if self.cli.debug {
+            eprintln!("  found correct UUID");
+            eprintln!("  item changed:");
+        }
+
+        for item in item_vec {
             if self.cli.debug {
-                eprintln!("  item changed:");
+                eprintln!("    {:?}", item);
             }
 
-            for item in item_vec {
-                if self.cli.debug {
-                    eprintln!("    {:?}", item);
-                }
-
-                if let dbus::MessageItem::DictEntry(key, value) = item {
-                    if let Some(btaddr_str) = (*btaddr).as_str() {
-                        return self.inquiry_service_data(&key, &value, btaddr_str);
-                    }
+            if let dbus::MessageItem::DictEntry(key, value) = item {
+                if let Some(btaddr_str) = (*btaddr).as_str() {
+                    return self.inquiry_service_data(&key, &value, btaddr_str);
                 }
             }
         }
