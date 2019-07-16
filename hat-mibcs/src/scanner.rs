@@ -61,7 +61,7 @@ impl<'a> Scanner<'a> {
             }
 
             if let Some(weight_data) = &last_weight_data {
-                if weight_data.done() || last_weight_data_seen.elapsed()? > Duration::new(5,0) {
+                if weight_data.done() || last_weight_data_seen.elapsed()? > Duration::new(30,0) {
                     if self.cli.debug {
                         eprintln!("  outputing weight data");
                     }
