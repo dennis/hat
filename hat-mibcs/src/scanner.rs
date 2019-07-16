@@ -47,6 +47,10 @@ impl<'a> Scanner<'a> {
                 ConnectionItem::Signal(signal) => {
                     match self.handle_signal(&signal)? {
                         Some(weight_data) => {
+                            if self.cli.debug {
+                                eprintln!("  got data, debouncing it");
+                            }
+
                             last_weight_data = Some(weight_data);
                             last_weight_data_seen = SystemTime::now();
                         },
@@ -58,11 +62,17 @@ impl<'a> Scanner<'a> {
 
             if let Some(weight_data) = &last_weight_data {
                 if weight_data.done() || last_weight_data_seen.elapsed()? > Duration::new(5,0) {
+                    if self.cli.debug {
+                        eprintln!("  outputing weight data");
+                    }
+
                     weight_data.dump()?;
                     last_weight_data = None;
 
                     if self.cli.until_data {
-                        eprintln!("  stopping as requested via params");
+                        if self.cli.debug {
+                            eprintln!("  stopping as requested via params");
+                        }
                         break;
                     }
                 }
@@ -72,7 +82,9 @@ impl<'a> Scanner<'a> {
                 let elapsed = now.elapsed()?;
 
                 if elapsed.as_secs() > self.cli.duration {
-                    eprintln!("  stopping as exceeding max duration defined via params");
+                    if self.cli.debug {
+                        eprintln!("  stopping as exceeding max duration defined via params");
+                    }
                     break;
                 }
             }
