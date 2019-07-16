@@ -295,7 +295,7 @@ impl<'a> Scanner<'a> {
                         .filter_map(|x| x.inner::<u8>().ok())
                         .collect();
 
-                    return Ok(Some(WeightData::decode(&bytes, btaddr)?));
+                    return Ok(Some(WeightData::decode(&bytes, btaddr, self.cli.debug)?));
                 }
             }
         }
