@@ -13,6 +13,7 @@ use crate::org_bluez_device1::OrgFreedesktopDBusProperties;
 use crate::weight_data::WeightData;
 
 static ADAPTER_INTERFACE: &'static str = "org.bluez.Adapter1";
+static DEVICE_INTERFACE: &'static str = "org.bluez.Device1";
 static SERVICE_NAME: &'static str = "org.bluez";
 static BODY_COMPOSITION_UUID: &'static str = "0000181b-0000-1000-8000-00805f9b34fb";
 
@@ -134,7 +135,7 @@ impl<'a> Scanner<'a> {
         {
             let items = signal.get_items();
 
-            if items[0] == dbus::MessageItem::Str("org.bluez.Device1".to_string()) && path.is_some()
+            if items[0] == dbus::MessageItem::Str(DEVICE_INTERFACE.to_string()) && path.is_some()
             {
                 if let dbus::MessageItem::Array(e) = &items[1] {
                     return self.inquiry_changed_properties(&path.unwrap(), e.to_vec());
@@ -163,7 +164,7 @@ impl<'a> Scanner<'a> {
         item_vec: Vec<dbus::MessageItem>,
     ) -> Result<Option<WeightData>, Box<Error>> {
         let device = self.connection.with_path(SERVICE_NAME, path, 1000);
-        let properties = device.get_all("org.bluez.Device1");
+        let properties = device.get_all(DEVICE_INTERFACE);
 
         if let Ok(properties) = properties {
             let btaddr = properties.get("Address");
