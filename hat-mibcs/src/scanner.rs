@@ -48,12 +48,14 @@ impl<'a> Scanner<'a> {
                 ConnectionItem::Signal(signal) => {
                     match self.handle_signal(&signal)? {
                         Some(weight_data) => {
-                            if self.cli.debug {
-                                eprintln!("  got data, debouncing it");
+                            if self.cli.debug { eprintln!("  got data, debouncing it"); }
+                            if weight_data.weight.is_none() {
+                                if self.cli.debug { eprintln!("  empty reading, ignoring"); }
                             }
-
-                            last_weight_data = Some(weight_data);
-                            last_weight_data_seen = SystemTime::now();
+                            else {
+                                last_weight_data = Some(weight_data);
+                                last_weight_data_seen = SystemTime::now();
+                            }
                         },
                         None => {}
                     }
