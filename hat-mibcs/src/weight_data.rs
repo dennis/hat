@@ -17,24 +17,39 @@ pub struct WeightData {
 }
 
 impl WeightData {
-    pub fn decode(value: &Vec<u8>, btaddr: &str) -> Result<WeightData, Box<Error>> {
+    pub fn decode(value: &Vec<u8>, btaddr: &str, debug : bool) -> Result<WeightData, Box<Error>> {
         let mut rdr = Cursor::new(value.clone());
 
-        let _statusbit0 = rdr.read_u8()?;
-        let statusbis1 = rdr.read_u8()?;
-        let _year = rdr.read_u16::<LittleEndian>()?;
-        let _month = rdr.read_u8()?;
-        let _day = rdr.read_u8()?;
-        let _hh = rdr.read_u8()?;
-        let _mm = rdr.read_u8()?;
-        let _ss = rdr.read_u8()?;
+        let statusbit0 = rdr.read_u8()?;
+        let statusbit1 = rdr.read_u8()?;
+        let year = rdr.read_u16::<LittleEndian>()?;
+        let month = rdr.read_u8()?;
+        let day = rdr.read_u8()?;
+        let hh = rdr.read_u8()?;
+        let mm = rdr.read_u8()?;
+        let ss = rdr.read_u8()?;
         let impedance = rdr.read_u16::<LittleEndian>()?;
         let weight = rdr.read_u16::<LittleEndian>()? as f32 * 0.01 / 2.0;
 
-        let got_impedance: bool = statusbis1 & 0b00000010 != 0;
-        let got_weight: bool = statusbis1 & 0b00000100 != 0;
-        let weight_stabilized: bool = statusbis1 & 0b00100000 != 0;
-        let impedance_stabilized: bool = statusbis1 & 0b10000000 != 0;
+        let got_impedance: bool = statusbit1 & 0b00000010 != 0;
+        let got_weight: bool = statusbit1 & 0b00000100 != 0;
+        let weight_stabilized: bool = statusbit1 & 0b00100000 != 0;
+        let impedance_stabilized: bool = statusbit1 & 0b10000000 != 0;
+
+        if debug {
+            eprintln!("  decoded weight data:");
+            eprintln!("    statusbit0  {:010b}", statusbit0);
+            eprintln!("    statusbit1  {:010b}", statusbit1);
+            eprintln!("    yymmdd      {:?}{:?}{:?}", year, month, day);
+            eprintln!("    hhmmss      {:?}{:?}{:?}", hh, mm, ss);
+            eprintln!("    impedance   {:?}", impedance);
+            eprintln!("    weight      {:?}", weight);
+            eprintln!("      impedance            {:?}", got_impedance);
+            eprintln!("      impedance_stabilized {:?}", impedance_stabilized);
+            eprintln!("      weight               {:?}", got_weight);
+            eprintln!("      weight_stabilized    {:?}", weight_stabilized);
+        }
+
 
         let weight = if got_weight && weight_stabilized {
             Some(weight)

@@ -13,6 +13,7 @@ use crate::org_bluez_device1::OrgFreedesktopDBusProperties;
 use crate::weight_data::WeightData;
 
 static ADAPTER_INTERFACE: &'static str = "org.bluez.Adapter1";
+static DEVICE_INTERFACE: &'static str = "org.bluez.Device1";
 static SERVICE_NAME: &'static str = "org.bluez";
 static BODY_COMPOSITION_UUID: &'static str = "0000181b-0000-1000-8000-00805f9b34fb";
 
@@ -47,12 +48,14 @@ impl<'a> Scanner<'a> {
                 ConnectionItem::Signal(signal) => {
                     match self.handle_signal(&signal)? {
                         Some(weight_data) => {
-                            if self.cli.debug {
-                                eprintln!("  got data, debouncing it");
+                            if self.cli.debug { eprintln!("  got data, debouncing it"); }
+                            if weight_data.weight.is_none() {
+                                if self.cli.debug { eprintln!("  empty reading, ignoring"); }
                             }
-
-                            last_weight_data = Some(weight_data);
-                            last_weight_data_seen = SystemTime::now();
+                            else {
+                                last_weight_data = Some(weight_data);
+                                last_weight_data_seen = SystemTime::now();
+                            }
                         },
                         None => {}
                     }
@@ -61,7 +64,7 @@ impl<'a> Scanner<'a> {
             }
 
             if let Some(weight_data) = &last_weight_data {
-                if weight_data.done() || last_weight_data_seen.elapsed()? > Duration::new(5,0) {
+                if weight_data.done() || last_weight_data_seen.elapsed()? > Duration::new(30,0) {
                     if self.cli.debug {
                         eprintln!("  outputing weight data");
                     }
@@ -134,7 +137,7 @@ impl<'a> Scanner<'a> {
         {
             let items = signal.get_items();
 
-            if items[0] == dbus::MessageItem::Str("org.bluez.Device1".to_string()) && path.is_some()
+            if items[0] == dbus::MessageItem::Str(DEVICE_INTERFACE.to_string()) && path.is_some()
             {
                 if let dbus::MessageItem::Array(e) = &items[1] {
                     return self.inquiry_changed_properties(&path.unwrap(), e.to_vec());
@@ -163,68 +166,53 @@ impl<'a> Scanner<'a> {
         item_vec: Vec<dbus::MessageItem>,
     ) -> Result<Option<WeightData>, Box<Error>> {
         let device = self.connection.with_path(SERVICE_NAME, path, 1000);
-        let properties = device.get_all("org.bluez.Device1");
+        let properties = device.get_all(DEVICE_INTERFACE)?;
 
-        if let Ok(properties) = properties {
-            let btaddr = properties.get("Address");
-            let name = properties.get("Name");
-            let uuids = properties.get("UUIDs");
+        let btaddr = if let Some(btaddr) = properties.get("Address") { btaddr } else { return Ok(None) };
+        let name   = if let Some(name)   = properties.get("Name")    { name }   else { return Ok(None) };
+        let uuids  = if let Some(uuids)  = properties.get("UUIDs")   { uuids }  else { return Ok(None) };
 
-            if btaddr.is_none() || name.is_none() || uuids.is_none() {
+        if self.cli.debug {
+            eprintln!("changed properties:");
+            eprintln!("  btaddr {:?}", btaddr);
+            eprintln!("  name   {:?}", name);
+            eprintln!("  uuids  {:?}", uuids);
+        }
+
+        if let dbus::arg::Variant(uuids) = uuids {
+            let iter = (*uuids).as_iter();
+
+            if iter.is_none() {
                 return Ok(None);
             }
 
-            let btaddr = btaddr.unwrap();
-            let name = name.unwrap();
-            let uuids = uuids.unwrap();
+            let mut iter = iter.unwrap();
 
-            if self.cli.debug {
-                eprintln!("changed properties:");
-                eprintln!("  btaddr {:?}", btaddr);
-                eprintln!("  name   {:?}", name);
-                eprintln!("  uuids  {:?}", uuids);
-            }
+            if !iter.any(|a| a.as_str() == Some(BODY_COMPOSITION_UUID)) {
+                if self.cli.debug { eprintln!("  discarding due to missing uuid"); }
 
-            if let dbus::arg::Variant(uuids) = uuids {
-                let iter = (*uuids).as_iter();
-
-                if iter.is_none() {
-                    return Ok(None);
-                }
-
-                let mut iter = iter.unwrap();
-
-                if !iter.any(|a| a.as_str() == Some(BODY_COMPOSITION_UUID))
-                {
-                    if self.cli.debug {
-                        eprintln!("  discarding due to missing uuid");
-                    }
-
-                    return Ok(None);
-                }
-                if self.cli.debug {
-                    eprintln!("  found correct UUID");
-                }
-            } else {
-                if self.cli.debug {
-                    eprintln!("  discarding - wrong type");
-                }
                 return Ok(None);
             }
+        }
+        else {
+            if self.cli.debug { eprintln!("  discarding - wrong type"); }
 
+            return Ok(None);
+        }
+
+        if self.cli.debug {
+            eprintln!("  found correct UUID");
+            eprintln!("  item changed:");
+        }
+
+        for item in item_vec {
             if self.cli.debug {
-                eprintln!("  item changed:");
+                eprintln!("    {:?}", item);
             }
 
-            for item in item_vec {
-                if self.cli.debug {
-                    eprintln!("    {:?}", item);
-                }
-
-                if let dbus::MessageItem::DictEntry(key, value) = item {
-                    if let Some(btaddr_str) = (*btaddr).as_str() {
-                        return self.inquiry_service_data(&key, &value, btaddr_str);
-                    }
+            if let dbus::MessageItem::DictEntry(key, value) = item {
+                if let Some(btaddr_str) = (*btaddr).as_str() {
+                    return self.inquiry_service_data(&key, &value, btaddr_str);
                 }
             }
         }
@@ -295,7 +283,7 @@ impl<'a> Scanner<'a> {
                         .filter_map(|x| x.inner::<u8>().ok())
                         .collect();
 
-                    return Ok(Some(WeightData::decode(&bytes, btaddr)?));
+                    return Ok(Some(WeightData::decode(&bytes, btaddr, self.cli.debug)?));
                 }
             }
         }
