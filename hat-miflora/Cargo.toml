@@ -5,6 +5,7 @@ authors = ["Dennis Møllegaard Pedersen <dennis@moellegaard.dk>"]
 edition = "2018"
 
 [dependencies]
+structopt = "0.2.10"
 blurz = "0.4.0"
 byteorder = "1.3.2"
 hex = "0.3.2"
