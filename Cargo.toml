@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+  "hat-mibcs",
+  "hat-miflora"
+]
