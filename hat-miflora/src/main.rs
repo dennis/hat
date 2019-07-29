@@ -63,8 +63,6 @@ mod my_date_format {
 
 
 fn scan_device(cli : &Cli, bt_session : &Session, device : &Device) -> Result<(), Box<Error>> {
-    device.is_connected()?;
-
     let mut command_char : Option<Characteristic> = None;
     let mut data_char : Option<Characteristic> = None;
     let mut firmware_char : Option<Characteristic> = None;
@@ -177,23 +175,21 @@ fn inquiry_device(cli : &Cli, bt_session : &Session, device_path : &String) -> R
     'uuid_loop: for uuid in uuids {
         if uuid == ROOT_SERVICE_UUID {
             if cli.debug { eprintln!("  Found correct UUID"); }
-            device.connect(10000).ok();
+            device.connect(20000)?;
 
-            if device.is_connected()? {
-                if cli.debug { eprintln!("  connected"); }
+            if cli.debug { eprintln!("  connected"); }
 
-                // We need to wait a bit after calling connect to safely
-                // get the gatt services
-                thread::sleep(Duration::from_millis(5000));
+            // We need to wait a bit after calling connect to safely
+            // get the gatt services
+            thread::sleep(Duration::from_millis(5000));
 
-                device.get_gatt_services()?;
+            device.get_gatt_services()?;
 
-                scan_device(cli, bt_session, &device)?;
-
-                break;
-            } else {
-                if cli.debug { eprintln!("  could not connect"); }
+            if let Err(error) = scan_device(cli, bt_session, &device) {
+                if cli.debug { eprintln!("  scan_device error: {:?}", error); }
             }
+
+            break;
         }
     }
 
@@ -227,7 +223,9 @@ fn scan(cli : &Cli) -> Result<(), Box<Error>> {
     }
 
     for d in devices {
-        inquiry_device(cli, bt_session, &d);
+        if let Err(err) = inquiry_device(cli, bt_session, &d) {
+            if cli.debug { eprintln!("  inquiry_device failed: {:?}", err); }
+        }
     }
     adapter.stop_discovery().ok();
 
