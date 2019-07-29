@@ -26,6 +26,7 @@ use blurz::bluetooth_gatt_characteristic::BluetoothGATTCharacteristic as Charact
 use blurz::bluetooth_gatt_service::BluetoothGATTService as Service;
 use blurz::bluetooth_session::BluetoothSession as Session;
 use chrono::prelude::*;
+use structopt::StructOpt;
 
 use serde::Serialize;
 
@@ -61,7 +62,7 @@ mod my_date_format {
 }
 
 
-fn scan_device(bt_session : &Session, device : &Device) -> Result<(), Box<Error>> {
+fn scan_device(cli : &Cli, bt_session : &Session, device : &Device) -> Result<(), Box<Error>> {
     device.is_connected()?;
 
     let mut command_char : Option<Characteristic> = None;
@@ -72,18 +73,22 @@ fn scan_device(bt_session : &Session, device : &Device) -> Result<(), Box<Error>
     for service in services {
         let s = Service::new(bt_session, service.clone());
         if s.get_uuid()? == DATA_SERVICE_UUID {
+            if cli.debug { eprintln!("  found data service"); }
             let characteristics = s.get_gatt_characteristics()?;
             for characteristic in characteristics {
                 let c = Characteristic::new(bt_session, characteristic.clone());
                 if c.get_uuid()? == FIRMWARE_CHAR_UUID {
+                    if cli.debug { eprintln!("    reading firmware char. uuid"); }
                     firmware_char = Some(c.clone())
                 }
 
                 if c.get_uuid()? == COMMAND_CHAR_UUID {
+                    if cli.debug { eprintln!("    reading command char. uuid"); }
                     command_char = Some(c.clone())
                 }
 
                 if c.get_uuid()? == DATA_CHAR_UUID {
+                    if cli.debug { eprintln!("    reading data char. uuid"); }
                     data_char = Some(c.clone());
                 }
             }
@@ -91,6 +96,7 @@ fn scan_device(bt_session : &Session, device : &Device) -> Result<(), Box<Error>
     }
 
     if command_char.is_none() || data_char.is_none() || firmware_char.is_none() {
+        if cli.debug { eprintln!("  not all characteristics are available, aborting"); }
         return Ok(())
     }
 
@@ -101,7 +107,7 @@ fn scan_device(bt_session : &Session, device : &Device) -> Result<(), Box<Error>
     command_char.write_value([0xa0, 0x1f].to_vec(), None)?;
 
     if command_char.read_value(None)? != [0xa0, 0x1f] {
-        // Something went wrong
+        if cli.debug { eprintln!("  Unexpected value from command char. uuid"); }
         return Ok(())
     }
 
@@ -114,6 +120,8 @@ fn scan_device(bt_session : &Session, device : &Device) -> Result<(), Box<Error>
      * 8-9  conductivity in µS/cm (16 bit little endian)
      */
 
+    if cli.debug { eprintln!("  parsing data"); }
+
     let mut rdr      = Cursor::new(value.clone());
 
     let temperature  = rdr.read_u16::<LittleEndian>()? as f32 * 0.1;
@@ -124,6 +132,7 @@ fn scan_device(bt_session : &Session, device : &Device) -> Result<(), Box<Error>
     let value = firmware_char.read_value(None)?;
 
     if value.len() != 7 {
+        if cli.debug { eprintln!("  Unexpected value for firmware char. value"); }
         // Something went wrong
         return Ok(())
     }
@@ -133,7 +142,7 @@ fn scan_device(bt_session : &Session, device : &Device) -> Result<(), Box<Error>
     command_char.write_value([0xb0, 0xff].to_vec(), None)?;
 
     if command_char.read_value(None)? != [0xb0, 0xff] {
-        // Something went wrong. Ignore it
+        if cli.debug { eprintln!("  Couldn't change mode"); }
         return Ok(())
     }
 
@@ -160,7 +169,38 @@ fn scan_device(bt_session : &Session, device : &Device) -> Result<(), Box<Error>
     Ok(())
 }
 
-fn scan() -> Result<(), Box<Error>> {
+fn inquiry_device(cli : &Cli, bt_session : &Session, device_path : &String) -> Result<(), Box<Error>> {
+    if cli.debug { eprintln!("device: {:?}", device_path); }
+
+    let device = Device::new(bt_session, device_path.clone());
+    let uuids = device.get_uuids()?;
+    'uuid_loop: for uuid in uuids {
+        if uuid == ROOT_SERVICE_UUID {
+            if cli.debug { eprintln!("  Found correct UUID"); }
+            device.connect(10000).ok();
+
+            if device.is_connected()? {
+                if cli.debug { eprintln!("  connected"); }
+
+                // We need to wait a bit after calling connect to safely
+                // get the gatt services
+                thread::sleep(Duration::from_millis(5000));
+
+                device.get_gatt_services()?;
+
+                scan_device(cli, bt_session, &device)?;
+
+                break;
+            } else {
+                if cli.debug { eprintln!("  could not connect"); }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn scan(cli : &Cli) -> Result<(), Box<Error>> {
     let bt_session = &Session::create_session(None)?;
     let adapter: Adapter = Adapter::init(bt_session)?;
     let session = DiscoverySession::create_session(
@@ -170,49 +210,40 @@ fn scan() -> Result<(), Box<Error>> {
 
     session.start_discovery()?;
 
-    for _ in 0..5 {
-        let devices = adapter.get_device_list()?;
-        if !devices.is_empty() {
-            break;
-        }
-        thread::sleep(Duration::from_millis(1000));
-    }
+    thread::sleep(Duration::from_millis(1000));
 
     session.stop_discovery()?;
 
     let devices = adapter.get_device_list()?;
     if devices.is_empty() {
-        return Err(Box::from("No device found"));
+        if cli.debug {
+            eprintln!("No devices found");
+        }
+        return Ok(());
+    }
+
+    if cli.debug {
+        eprintln!("devices: {:?}", devices);
     }
 
     for d in devices {
-        let device = Device::new(bt_session, d.clone());
-        let uuids = device.get_uuids()?;
-        'uuid_loop: for uuid in uuids {
-            if uuid == ROOT_SERVICE_UUID {
-                device.connect(10000).ok();
-
-                if device.is_connected()? {
-                    // We need to wait a bit after calling connect to safely
-                    // get the gatt services
-                    thread::sleep(Duration::from_millis(5000));
-
-                    device.get_gatt_services()?;
-
-                    scan_device(bt_session, &device)?;
-                } else {
-                    eprintln!("could not connect");
-                }
-            }
-        }
+        inquiry_device(cli, bt_session, &d);
     }
     adapter.stop_discovery().ok();
 
     Ok(())
 }
 
+#[derive(StructOpt)]
+pub struct Cli {
+    #[structopt(short = "d", long = "debug")]
+    pub debug: bool
+}
+
 fn main() {
-    match scan() {
+    let cli = Cli::from_args();
+
+    match scan(&cli) {
         Ok(_) => (),
         Err(e) => eprintln!("{:?}", e),
     }
