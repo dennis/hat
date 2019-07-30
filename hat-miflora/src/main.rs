@@ -111,21 +111,15 @@ fn scan_device(cli : &Cli, bt_session : &Session, device : &Device) -> Result<()
 
     let value = data_char.read_value(None)?;
 
-    /*
-     * 0-1 temperature in 0.1 degress celcius (16 bit little endian)
-     * 3-6 light in lux (32 bit little endian)
-     * 7    moisture in %
-     * 8-9  conductivity in µS/cm (16 bit little endian)
-     */
-
-    if cli.debug { eprintln!("  parsing data"); }
+    if cli.debug { eprintln!("  parsing data: {:?}", value.clone()); }
 
     let mut rdr      = Cursor::new(value.clone());
 
-    let temperature  = rdr.read_u16::<LittleEndian>()? as f32 * 0.1;
-    let lux        = rdr.read_u32::<LittleEndian>()?;
-    let moisture     = rdr.read_u8()?;
-    let conductivity = rdr.read_u16::<LittleEndian>()?;
+    let temperature      = rdr.read_u16::<LittleEndian>()? as f32 * 0.1; // byte 0-1
+    let _unknown         = rdr.read_u8()?;                               //      2
+    let lux              = rdr.read_u32::<LittleEndian>()?;              //      3-6
+    let moisture         = rdr.read_u8()?;                               //      7
+    let conductivity     = rdr.read_u16::<LittleEndian>()?;              //      8-9
 
     let value = firmware_char.read_value(None)?;
 

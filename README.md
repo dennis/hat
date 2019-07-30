@@ -43,6 +43,8 @@ Home Assistant, OpenHab or Node-Red can do further processing of data.
 connect and query all reachable Miflora sensor and output the data retrieved as
 JSON.
 
+NOTICE: This have only been tested with version 3.1.8+ firmware
+
 It will only fetch data once. If you want to have it gather every hour or
 similar, then add it to your crontab.
 
@@ -51,7 +53,8 @@ The following example shows the output from Miflora I get here at my desk.
 
 ```
 hat-miflora
-{"source": "hat-miflora","name":"Flower care","address":"C4:7C:8D:65:BD:8B","datetime":"2019-06-29 16:04:59","temperature":26.800001,"lux":8704,"moisture":0,"conductivity":0,"battery":99,"version":"3.1.8","serial":"65bd8b14d57490c1192c97a70f398da4"}
+{"source":"hat-miflora","name":"Flower care","address":"C4:7C:8D:65:BD:8B","datetime":"2019-07-30 18:45:23","temperature":25.6,"lux":113,"moisture":14,"conductivity":146,"battery":98,"version":"3.1.9","serial":"65bd8b14d57490c1192c97a70f398da4"}
+
 ```
 
 As with `hat-mibcs`, use `mosquitto_pub` to publish the json to MQTT.
