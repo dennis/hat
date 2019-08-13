@@ -23,8 +23,10 @@ fn main() {
     let mifloras = scanner.find_mifloras(bt_session).unwrap();
 
     for miflora in mifloras.iter() {
-        println!(" {:?}", miflora);
-        miflora.connect(bt_session).unwrap().read(bt_session, cli.debug);
+        match miflora.connect(bt_session).and_then(|miflora| miflora.read(bt_session, cli.debug)) {
+            Ok(_) => (),
+            Err(err) => eprintln!("{:?}", err)
+        }
     }
 
     ()

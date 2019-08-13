@@ -36,8 +36,6 @@ impl Miflora {
 
         device.connect(20000)?;
 
-        if true { eprintln!("  connected"); }
-
         Ok(ConnectedMiflora { device })
     }
 }
@@ -77,50 +75,53 @@ pub struct ConnectedMiflora<'a> {
     pub device : Device<'a>
 }
 
+fn find_data_service(service : &Service) -> bool {
+    if let Ok(result) = service.get_uuid() {
+        result == DATA_SERVICE_UUID
+    }
+    else {
+        false
+    }
+}
+
+fn find_command_characteristic(characteristic: &Characteristic) -> bool {
+    return characteristic.get_uuid().unwrap_or("".to_string()) == COMMAND_CHAR_UUID;
+}
+
+fn find_firmware_characteristic(characteristic : &Characteristic) -> bool {
+    return characteristic.get_uuid().unwrap_or("".to_string()) == FIRMWARE_CHAR_UUID;
+}
+
+fn find_data_characteristic(characteristic : &Characteristic) -> bool {
+    return characteristic.get_uuid().unwrap_or("".to_string()) == DATA_CHAR_UUID;
+}
+
 impl<'a> ConnectedMiflora<'a> {
     pub fn read(&self, bt_session : &Session, debug : bool) -> Result<(), Box<Error>> {
-        let mut command_char : Option<Characteristic> = None;
-        let mut data_char : Option<Characteristic> = None;
-        let mut firmware_char : Option<Characteristic> = None;
-
         // We need to wait a bit after calling connect to safely
         // get the gatt services
+        if debug { eprintln!("  getting gatt services"); }
+
         thread::sleep(Duration::from_millis(5000));
         let services = self.device.get_gatt_services()?;
 
-        for service in services {
-            let s = Service::new(bt_session, service.clone());
-            if s.get_uuid()? == DATA_SERVICE_UUID {
-                if debug { eprintln!("  found data service"); }
-                let characteristics = s.get_gatt_characteristics()?;
-                for characteristic in characteristics {
-                    let c = Characteristic::new(bt_session, characteristic.clone());
-                    if c.get_uuid()? == FIRMWARE_CHAR_UUID {
-                        if debug { eprintln!("    reading firmware char. uuid"); }
-                        firmware_char = Some(c.clone())
-                    }
+        let data_service =
+            services
+               .iter()
+               .map( |service| Service::new(bt_session, service.clone()) )
+               .find(find_data_service)
+               .ok_or("data service not found")?;
 
-                    if c.get_uuid()? == COMMAND_CHAR_UUID {
-                        if debug { eprintln!("    reading command char. uuid"); }
-                        command_char = Some(c.clone())
-                    }
+        let characteristics = data_service.get_gatt_characteristics()?;
 
-                    if c.get_uuid()? == DATA_CHAR_UUID {
-                        if debug { eprintln!("    reading data char. uuid"); }
-                        data_char = Some(c.clone());
-                    }
-                }
-            }
-        }
+        let characteristics_iter = || characteristics
+            .clone()
+            .into_iter()
+            .map(|characteristic| Characteristic::new(bt_session, characteristic.clone()) );
 
-        if command_char.is_none() || data_char.is_none() || firmware_char.is_none() {
-            if debug { eprintln!("  not all characteristics are available, aborting"); }
-            return Ok(())
-        }
-
-        let command_char = command_char.unwrap();
-        let data_char = data_char.unwrap();
-        let firmware_char = firmware_char.unwrap();
+        let firmware_char = characteristics_iter().find(find_firmware_characteristic).ok_or("firmware characteristic not found")?;
+        let command_char  = characteristics_iter().find(find_command_characteristic).ok_or("command characteristic not found")?;
+        let data_char     = characteristics_iter().find(find_data_characteristic).ok_or("data characteristic not found")?;
 
         command_char.write_value([0xa0, 0x1f].to_vec(), None)?;
 
@@ -145,7 +146,6 @@ impl<'a> ConnectedMiflora<'a> {
 
         if value.len() != 7 {
             if debug { eprintln!("  Unexpected value for firmware char. value"); }
-            // Something went wrong
             return Ok(())
         }
         let battery = value[0];
