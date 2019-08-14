@@ -97,6 +97,14 @@ fn find_data_characteristic(characteristic : &Characteristic) -> bool {
 }
 
 impl<'a> ConnectedMiflora<'a> {
+    pub fn get_address(&self) -> Result<String, Box<Error>> {
+        return self.device.get_address();
+    }
+
+    pub fn get_name(&self) -> Result<String, Box<Error>> {
+        return self.device.get_alias();
+    }
+
     pub fn read(&self, bt_session : &Session, debug : bool) -> Result<(), Box<Error>> {
         // We need to wait a bit after calling connect to safely
         // get the gatt services
@@ -162,8 +170,8 @@ impl<'a> ConnectedMiflora<'a> {
 
         let readings = MifloraReadings {
             source: &"hat-miflora".to_string(),
-            name: &self.device.get_alias()?,
-            address : &self.device.get_address()?,
+            name: &self.get_name()?,
+            address : &self.get_address()?,
             created_at : Local::now(),
             temperature: temperature,
             lux: lux,
