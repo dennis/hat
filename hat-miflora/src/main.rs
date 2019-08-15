@@ -15,7 +15,7 @@ use structopt::StructOpt;
 use scanner::Scanner;
 use blurz::bluetooth_session::BluetoothSession as Session;
 
-fn inquery_miflora(bt_session : &Session, miflora : &ConnectedMiflora, cli : &Cli) {
+fn inquery_miflora(miflora : &ConnectedMiflora, cli : &Cli) {
     // check if we want readings from a specific address
     if let Some(addr) = &cli.address {
         if let Ok(miflora_address) = miflora.get_address() {
@@ -36,14 +36,27 @@ fn inquery_miflora(bt_session : &Session, miflora : &ConnectedMiflora, cli : &Cl
         }
     }
 
-    match miflora.read(bt_session, cli.debug) {
-        Ok(_) => (),
-        Err(err) => eprintln!("{:?}", err)
+    if cli.realtime {
+        match miflora.realtime(cli.debug) {
+            Ok(_) => (),
+            Err(err) => eprintln!("{:?}", err)
+        }
+    }
+
+    if cli.blink {
+        match miflora.blink(cli.debug) {
+            Ok(_) => (),
+            Err(err) => eprintln!("{:?}", err)
+        }
     }
 }
 
 fn main() {
-    let cli = Cli::from_args();
+    let mut cli = Cli::from_args();
+
+    if !cli.blink && !cli.realtime {
+        cli.realtime = true;
+    }
 
     let scanner = Scanner::new(&cli);
     let bt_session = &Session::create_session(None).unwrap();
@@ -55,7 +68,7 @@ fn main() {
 
         miflora
             .connect(bt_session)
-            .map(|miflora| inquery_miflora(bt_session, &miflora, &cli));
+            .map(|miflora| inquery_miflora(&miflora, &cli));
     }
 
     ()

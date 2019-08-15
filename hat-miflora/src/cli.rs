@@ -11,4 +11,10 @@ pub struct Cli {
     /// Filter by bluetooth name
     #[structopt(short = "n", long = "name")]
     pub name : Option<String>,
+    /// Make miflora blink
+    #[structopt(short = "b", long = "blink")]
+    pub blink : bool,
+    /// read realtime data
+    #[structopt(short = "r", long = "realtime")]
+    pub realtime : bool,
 }
