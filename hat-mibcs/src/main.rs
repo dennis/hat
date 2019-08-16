@@ -1,11 +1,9 @@
 extern crate byteorder;
-extern crate dbus;
+extern crate dbus_common;
 
 extern crate chrono;
 
 mod cli;
-mod org_bluez_adapter1;
-mod org_bluez_device1;
 mod scanner;
 mod weight_data;
 

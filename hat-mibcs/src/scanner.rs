@@ -8,8 +8,8 @@ use std::time::SystemTime;
 use std::time::Duration;
 
 use crate::cli::Cli;
-use crate::org_bluez_adapter1::OrgBluezAdapter1;
-use crate::org_bluez_device1::OrgFreedesktopDBusProperties;
+use dbus_common::org_bluez_adapter1::OrgBluezAdapter1;
+use dbus_common::org_bluez_device1::OrgFreedesktopDBusProperties;
 use crate::weight_data::WeightData;
 
 static ADAPTER_INTERFACE: &'static str = "org.bluez.Adapter1";
