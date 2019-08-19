@@ -1,6 +1,7 @@
 extern crate blurz;
 extern crate byteorder;
 extern crate hex;
+extern crate dbus_common;
 
 mod scanner;
 mod cli;
@@ -58,10 +59,10 @@ fn main() {
         cli.realtime = true;
     }
 
-    let scanner = Scanner::new(&cli);
+    let scanner = Scanner::new(&cli).unwrap();
     let bt_session = &Session::create_session(None).unwrap();
 
-    let mifloras = scanner.find_mifloras(bt_session).unwrap();
+    let mifloras = scanner.find_mifloras().unwrap();
 
     for miflora in mifloras.iter() {
         if cli.debug { eprintln!("checking: {:?}", miflora); }
