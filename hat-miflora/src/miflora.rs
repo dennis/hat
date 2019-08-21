@@ -7,90 +7,140 @@ static DATA_CHAR_UUID: &'static str = "00001a01-0000-1000-8000-00805f9b34fb";
 static DEVICE_MODE_REALTIME: [u8; 2] = [0xa0, 0x1f];
 static DEVICE_MODE_BLINK: [u8; 2] = [0xfd, 0xff];
 
-use std::error::Error;
+use std::error;
 use std::fmt;
 
+use std::io::Cursor;
+use std::ops::Drop;
 use std::thread;
 use std::time::Duration;
-use std::io::Cursor;
 
 use byteorder::{LittleEndian, ReadBytesExt};
-
-use blurz::bluetooth_device::BluetoothDevice as Device;
-use blurz::bluetooth_gatt_characteristic::BluetoothGATTCharacteristic as Characteristic;
-use blurz::bluetooth_gatt_service::BluetoothGATTService as Service;
-use blurz::bluetooth_session::BluetoothSession as Session;
 
 use chrono::prelude::*;
 use serde::Serialize;
 
+use dbus::{BusType, Connection, MessageItem};
+
+use dbus_common::org_bluez_device1::OrgBluezDevice1;
+use dbus_common::org_bluez_gatt_characteristic1::OrgBluezGattCharacteristic1;
+use dbus_common::utils::SERVICE_NAME;
+
+use dbus_common::utils::get_managed_objects_with_interface;
+
 #[derive(Debug)]
-struct DeviceModeChangeError;
-
-impl Error for DeviceModeChangeError {
+pub enum AppError {
+    DBusConnectError,
+    DeviceConnectError,
+    DeviceDisconnectError,
+    DeviceModeChangeError,
+    ReadingPropertyError,
+    BlinkError,
+    JSONError,
+    ReadingMifloraDataError,
+    ReadingMifloraVersionError,
+    ReadingFirmwareDataError,
+    ReadingDataValues,
+    UnexpectedFirmwareDataLength,
+    ParsingConductivityError,
+    ParsingMoistureError,
+    ParsingLuxError,
+    ParsingUnknownError,
+    ParsingTemperatureError,
+    CantFindFirmwareCharacteristicUuid,
+    CantFindDeviceModeCharacteristicUuid,
+    CantFindDataCharacteristicUuid,
+    DBusCannotGetObjects,
+    CannotFindDataServiceUuid,
+    DBusCannotFindCharacteristics,
 }
-
-impl fmt::Display for DeviceModeChangeError {
+impl error::Error for AppError {}
+impl fmt::Display for AppError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Failed changing device mode")
+        write!(f, "ERROR: {:?}", self)
     }
 }
 
 #[derive(Debug)]
 pub struct Miflora {
-    device_path : String,
+    device_path: String,
+    connection: Connection,
 }
 
 impl Miflora {
-    pub fn new(device_path : String) -> Miflora {
-        Miflora {
+    pub fn new(device_path: String) -> Result<Miflora, AppError> {
+        Ok(Miflora {
+            connection: Connection::get_private(BusType::System)
+                .map_err(|_| AppError::DBusConnectError)?,
             device_path,
-        }
+        })
     }
 
-    pub fn connect<'a>(&self, bt_session : &'a Session) -> Result<ConnectedMiflora<'a>, Box<Error>> {
-        let device = Device::new(bt_session, self.device_path.clone());
+    pub fn connect<'a>(&self) -> Result<ConnectedMiflora, AppError> {
+        let device = self
+            .connection
+            .with_path(SERVICE_NAME, self.device_path.clone(), 5000);
 
-        device.connect(20000)?;
+        device.connect().map_err(|_| AppError::DeviceConnectError)?;
+        device
+            .disconnect()
+            .map_err(|_| AppError::DeviceDisconnectError)?;
 
-        thread::sleep(Duration::from_millis(5000));
-        let services = device.get_gatt_services()?;
+        let services = get_managed_objects_with_interface(
+            &self.connection,
+            &"org.bluez.GattService1",
+            &self.device_path,
+            "Device",
+        )
+        .map_err(|_| AppError::DBusCannotGetObjects)?;
+        let data_service = services
+            .iter()
+            .find(|path| find_data_service(&self.connection, path))
+            .ok_or(AppError::CannotFindDataServiceUuid)?;
+        let characteristics = get_managed_objects_with_interface(
+            &self.connection,
+            &"org.bluez.GattCharacteristic1",
+            &data_service,
+            "Service",
+        )
+        .map_err(|_| AppError::DBusCannotFindCharacteristics)?;
 
-        let data_service =
-            services
-               .iter()
-               .map( |service| Service::new(bt_session, service.clone()) )
-               .find(find_data_service)
-               .ok_or("data service not found")?;
+        let firmware_char = characteristics
+            .iter()
+            .find(|path| find_characteristic(&self.connection, path, FIRMWARE_CHAR_UUID))
+            .ok_or(AppError::CantFindFirmwareCharacteristicUuid)?;
+        let device_mode_char = characteristics
+            .iter()
+            .find(|path| find_characteristic(&self.connection, path, DEVICE_MODE_CHAR_UUID))
+            .ok_or(AppError::CantFindDeviceModeCharacteristicUuid)?;
+        let data_char = characteristics
+            .iter()
+            .find(|path| find_characteristic(&self.connection, path, DATA_CHAR_UUID))
+            .ok_or(AppError::CantFindDataCharacteristicUuid)?;
 
-        let characteristics = data_service.get_gatt_characteristics()?;
-
-        let characteristics_iter = || characteristics
-            .clone()
-            .into_iter()
-            .map(|characteristic| Characteristic::new(bt_session, characteristic.clone()) );
-
-        let firmware_char    = characteristics_iter().find(find_firmware_characteristic).ok_or("firmware characteristic not found")?;
-        let device_mode_char = characteristics_iter().find(find_device_mode_characteristic).ok_or("device mode characteristic not found")?;
-        let data_char        = characteristics_iter().find(find_data_characteristic).ok_or("data characteristic not found")?;
-
-        Ok(ConnectedMiflora { device, firmware_char, device_mode_char, data_char })
+        ConnectedMiflora::new(
+            &self.device_path,
+            firmware_char,
+            device_mode_char,
+            data_char,
+        )
     }
 }
+
 #[derive(Clone, Serialize)]
 struct MifloraReadings<'t> {
-    source : &'t String,
-    name : &'t String,
-    address : &'t String,
+    source: &'t String,
+    name: &'t String,
+    address: &'t String,
     #[serde(with = "my_date_format", rename = "datetime")]
     pub created_at: DateTime<Local>,
-    temperature : f32,
-    lux : u32,
-    moisture : u8,
-    conductivity : u16,
-    battery : u8,
-    version : &'t String,
-    serial  : &'t String,
+    temperature: f32,
+    lux: u32,
+    moisture: u8,
+    conductivity: u16,
+    battery: u8,
+    version: &'t String,
+    serial: &'t String,
 }
 
 mod my_date_format {
@@ -108,111 +158,199 @@ mod my_date_format {
     }
 }
 
-#[derive(Debug)]
-pub struct ConnectedMiflora<'a> {
-    pub device : Device<'a>,
-    firmware_char : Characteristic<'a>,
-    device_mode_char : Characteristic<'a>,
-    data_char : Characteristic<'a>,
-}
+fn find_data_service(connection: &Connection, path: &str) -> bool {
+    let p = dbus_common::utils::get_property(connection, &"org.bluez.GattService1", path, "UUID");
 
-fn find_data_service(service : &Service) -> bool {
-    if let Ok(result) = service.get_uuid() {
+    if let Ok(MessageItem::Str(result)) = p {
         result == DATA_SERVICE_UUID
-    }
-    else {
+    } else {
         false
     }
 }
 
-fn find_device_mode_characteristic(characteristic: &Characteristic) -> bool {
-    return characteristic.get_uuid().unwrap_or("".to_string()) == DEVICE_MODE_CHAR_UUID;
+fn find_characteristic(connection: &Connection, path: &str, uuid: &str) -> bool {
+    let p = dbus_common::utils::get_property(
+        connection,
+        &"org.bluez.GattCharacteristic1",
+        path,
+        "UUID",
+    );
+
+    if let Ok(MessageItem::Str(result)) = p {
+        result == uuid
+    } else {
+        false
+    }
 }
 
-fn find_firmware_characteristic(characteristic : &Characteristic) -> bool {
-    return characteristic.get_uuid().unwrap_or("".to_string()) == FIRMWARE_CHAR_UUID;
+#[derive(Debug)]
+pub struct ConnectedMiflora {
+    connection: Connection,
+    device_objpath: String,
+    firmware_objpath: String,
+    device_mode_objpath: String,
+    data_objpath: String,
 }
 
-fn find_data_characteristic(characteristic : &Characteristic) -> bool {
-    return characteristic.get_uuid().unwrap_or("".to_string()) == DATA_CHAR_UUID;
-}
+impl ConnectedMiflora {
+    pub fn new(
+        device_objpath: &str,
+        firmware_objpath: &str,
+        device_mode_objpath: &str,
+        data_objpath: &str,
+    ) -> Result<ConnectedMiflora, AppError> {
+        let connection =
+            Connection::get_private(BusType::System).map_err(|_| AppError::DBusConnectError)?;
+        let device = connection.with_path(SERVICE_NAME, device_objpath.clone(), 5000);
 
-impl<'a> ConnectedMiflora<'a> {
-    pub fn get_address(&self) -> Result<String, Box<Error>> {
-        return self.device.get_address();
+        device.connect().map_err(|_| AppError::DeviceConnectError)?;
+        thread::sleep(Duration::from_millis(5000));
+
+        Ok(ConnectedMiflora {
+            connection,
+            device_objpath: device_objpath.to_string(),
+            firmware_objpath: firmware_objpath.to_string(),
+            device_mode_objpath: device_mode_objpath.to_string(),
+            data_objpath: data_objpath.to_string(),
+        })
     }
 
-    pub fn get_name(&self) -> Result<String, Box<Error>> {
-        return self.device.get_alias();
+    pub fn get_address(&self) -> Result<String, AppError> {
+        let device = self
+            .connection
+            .with_path(SERVICE_NAME, self.device_objpath.clone(), 5000);
+        device
+            .get_address()
+            .map_err(|_| AppError::ReadingPropertyError)
     }
 
-    pub fn blink(&self, debug : bool) -> Result<(), Box<Error>> {
-        if debug { eprintln!("  BLINK"); }
+    pub fn get_name(&self) -> Result<String, AppError> {
+        let device = self
+            .connection
+            .with_path(SERVICE_NAME, self.device_objpath.clone(), 5000);
+        device
+            .get_alias()
+            .map_err(|_| AppError::ReadingPropertyError)
+    }
 
-        self.set_device_mode(DEVICE_MODE_BLINK, debug)?;
+    pub fn blink(&self, debug: bool) -> Result<(), AppError> {
+        if debug {
+            eprintln!("  BLINK");
+        }
+
+        self.set_device_mode(DEVICE_MODE_BLINK, debug)
+            .map_err(|_| AppError::BlinkError)?;
 
         Ok(())
     }
 
-    pub fn realtime(&self, debug : bool) -> Result<(), Box<Error>> {
-        if debug { eprintln!("  REALTIME READINGS"); }
+    pub fn realtime(&self, debug: bool) -> Result<(), AppError> {
+        if debug {
+            eprintln!("  REALTIME READINGS using {:?}", self.firmware_objpath);
+        }
 
         self.set_device_mode(DEVICE_MODE_REALTIME, debug)?;
 
-        let value = self.data_char.read_value(None)?;
+        let value = self
+            .connection
+            .with_path(SERVICE_NAME, &self.data_objpath, 5000)
+            .read_value(std::collections::HashMap::new())
+            .map_err(|_| AppError::ReadingDataValues)?;
 
-        if debug { eprintln!("  parsing data: {:?}", value.clone()); }
+        if debug {
+            eprintln!("  parsing data: {:?}", value.clone());
+        }
 
-        let mut rdr          = Cursor::new(value.clone());
+        let mut rdr = Cursor::new(value.clone());
 
-        let temperature      = rdr.read_u16::<LittleEndian>()? as f32 * 0.1; // byte 0-1
-        let _unknown         = rdr.read_u8()?;                               //      2
-        let lux              = rdr.read_u32::<LittleEndian>()?;              //      3-6
-        let moisture         = rdr.read_u8()?;                               //      7
-        let conductivity     = rdr.read_u16::<LittleEndian>()?;              //      8-9
+        let temperature = rdr
+            .read_u16::<LittleEndian>()
+            .map_err(|_| AppError::ParsingTemperatureError)? as f32
+            * 0.1; // byte 0-1
+        let _unknown = rdr.read_u8().map_err(|_| AppError::ParsingUnknownError)?; //      2
+        let lux = rdr
+            .read_u32::<LittleEndian>()
+            .map_err(|_| AppError::ParsingLuxError)?; //      3-6
+        let moisture = rdr.read_u8().map_err(|_| AppError::ParsingMoistureError)?; //      7
+        let conductivity = rdr
+            .read_u16::<LittleEndian>()
+            .map_err(|_| AppError::ParsingConductivityError)?; //      8-9
 
-        let value = self.firmware_char.read_value(None)?;
-
+        let value = self
+            .connection
+            .with_path(SERVICE_NAME, &self.firmware_objpath, 5000)
+            .read_value(std::collections::HashMap::new())
+            .map_err(|_| AppError::ReadingFirmwareDataError)?;
         if value.len() != 7 {
-            if debug { eprintln!("  Unexpected value for firmware char. value"); }
-            return Ok(())
+            if debug {
+                eprintln!("  Unexpected value for firmware char. value");
+            }
+            return Err(AppError::UnexpectedFirmwareDataLength);
         }
 
         let battery = value[0];
-        let version = String::from_utf8(value[2 .. 7].to_vec())?;
+        let version = String::from_utf8(value[2..7].to_vec())
+            .map_err(|_| AppError::ReadingMifloraVersionError)?;
 
-        let serial = hex::encode(self.data_char.read_value(None)?);
+        let value = self
+            .connection
+            .with_path(SERVICE_NAME, &self.data_objpath, 5000)
+            .read_value(std::collections::HashMap::new())
+            .map_err(|_| AppError::ReadingMifloraDataError)?;
+        let serial = hex::encode(value);
 
         let readings = MifloraReadings {
             source: &"hat-miflora".to_string(),
             name: &self.get_name()?,
-            address : &self.get_address()?,
-            created_at : Local::now(),
+            address: &self.get_address()?,
+            created_at: Local::now(),
             temperature: temperature,
             lux: lux,
             moisture: moisture,
             conductivity: conductivity,
             battery: battery,
             version: &version,
-            serial: &serial
+            serial: &serial,
         };
 
-        println!("{}", serde_json::to_string(&readings)?);
-
-        self.device.disconnect()?;
+        println!(
+            "{}",
+            serde_json::to_string(&readings).map_err(|_| AppError::JSONError)?
+        );
 
         Ok(())
     }
 
-    fn set_device_mode(&self, command : [u8; 2], debug : bool) -> Result<(), Box<Error>> {
-        self.device_mode_char.write_value(command.to_vec(), None)?;
+    fn set_device_mode(&self, command: [u8; 2], debug: bool) -> Result<(), AppError> {
+        let device_mode_char =
+            self.connection
+                .with_path(SERVICE_NAME, &self.device_mode_objpath, 5000);
 
-        if self.device_mode_char.read_value(None)? != command {
-            if debug { eprintln!("  Unexpected value from command char. uuid"); }
-            return Err(Box::new(DeviceModeChangeError))
+        device_mode_char
+            .write_value(command.to_vec(), std::collections::HashMap::new())
+            .map_err(|_| AppError::DeviceModeChangeError)?;
+
+        if device_mode_char
+            .read_value(std::collections::HashMap::new())
+            .map_err(|_| AppError::DeviceModeChangeError)?
+            != command
+        {
+            if debug {
+                eprintln!("  Unexpected value from command char. uuid");
+            }
+            return Err(AppError::DeviceModeChangeError);
         }
 
         Ok(())
     }
+}
 
+impl Drop for ConnectedMiflora {
+    fn drop(&mut self) {
+        let device = self
+            .connection
+            .with_path(SERVICE_NAME, self.device_objpath.clone(), 5000);
+
+        device.disconnect().ok();
+    }
 }

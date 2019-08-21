@@ -1,27 +1,29 @@
-extern crate blurz;
 extern crate byteorder;
-extern crate hex;
 extern crate dbus_common;
+extern crate hex;
 
-mod scanner;
 mod cli;
 mod miflora;
+mod scanner;
 
 // https://github.com/ChrisScheffler/miflora/wiki/The-Basics
 
-use cli::Cli;
-use miflora::Miflora;
-use miflora::ConnectedMiflora;
-use structopt::StructOpt;
-use scanner::Scanner;
-use blurz::bluetooth_session::BluetoothSession as Session;
+use std::error::Error;
 
-fn inquery_miflora(miflora : &ConnectedMiflora, cli : &Cli) {
+use cli::Cli;
+use miflora::ConnectedMiflora;
+use miflora::Miflora;
+use scanner::Scanner;
+use structopt::StructOpt;
+
+fn inquery_miflora(miflora: &ConnectedMiflora, cli: &Cli) {
     // check if we want readings from a specific address
     if let Some(addr) = &cli.address {
         if let Ok(miflora_address) = miflora.get_address() {
             if addr != &miflora_address {
-                if cli.debug { eprintln!("  address {:?} doesn't match, skipping", miflora_address); }
+                if cli.debug {
+                    eprintln!("  address {:?} doesn't match, skipping", miflora_address);
+                }
                 return;
             }
         }
@@ -31,7 +33,9 @@ fn inquery_miflora(miflora : &ConnectedMiflora, cli : &Cli) {
     if let Some(name) = &cli.name {
         if let Ok(miflora_name) = miflora.get_name() {
             if name != &miflora_name {
-                if cli.debug { eprintln!("  name {:?} doesn't match, skipping", miflora_name); }
+                if cli.debug {
+                    eprintln!("  name {:?} doesn't match, skipping", miflora_name);
+                }
                 return;
             }
         }
@@ -40,16 +44,37 @@ fn inquery_miflora(miflora : &ConnectedMiflora, cli : &Cli) {
     if cli.realtime {
         match miflora.realtime(cli.debug) {
             Ok(_) => (),
-            Err(err) => eprintln!("{:?}", err)
+            Err(err) => eprintln!("{:?}", err),
         }
     }
 
     if cli.blink {
         match miflora.blink(cli.debug) {
             Ok(_) => (),
-            Err(err) => eprintln!("{:?}", err)
+            Err(err) => eprintln!("{:?}", err),
         }
     }
+}
+
+fn do_main(cli: &Cli) -> Result<(), Box<Error>> {
+    let scanner = Scanner::new(&cli)?;
+    let mifloras = scanner.find_mifloras()?;
+
+    for miflora in mifloras.iter() {
+        if cli.debug {
+            eprintln!("{:?}", miflora);
+        }
+
+        let r = miflora
+            .connect()
+            .map(|miflora| inquery_miflora(&miflora, &cli));
+
+        if let Err(e) = r {
+            eprintln!("{:?}", e);
+        }
+    }
+
+    Ok(())
 }
 
 fn main() {
@@ -59,17 +84,9 @@ fn main() {
         cli.realtime = true;
     }
 
-    let scanner = Scanner::new(&cli).unwrap();
-    let bt_session = &Session::create_session(None).unwrap();
-
-    let mifloras = scanner.find_mifloras().unwrap();
-
-    for miflora in mifloras.iter() {
-        if cli.debug { eprintln!("checking: {:?}", miflora); }
-
-        miflora
-            .connect(bt_session)
-            .map(|miflora| inquery_miflora(&miflora, &cli));
+    match do_main(&cli) {
+        Ok(_) => (),
+        Err(err) => eprintln!("{:?}", err),
     }
 
     ()

@@ -16,7 +16,7 @@ impl DbusProcessor {
         if self.debug { eprintln!("Scanning for known devices"); }
 
         let r : Vec<String> =
-            get_managed_objects_with_interface(connection, &DEVICE_INTERFACE.to_string())?
+            get_managed_objects_with_interface(connection, &DEVICE_INTERFACE, "", "")?
                 .iter()
                 .filter(|&device_path| self.probe_device(connection, device_path).unwrap_or(false) )
                 .map(|device_path| device_path.clone())
