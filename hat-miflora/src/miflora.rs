@@ -207,7 +207,6 @@ impl ConnectedMiflora {
         let device = connection.with_path(SERVICE_NAME, device_objpath.clone(), 10000);
 
         device.connect().map_err(|err| AppError::DBusDeviceConnectError(err))?;
-        thread::sleep(Duration::from_millis(5000));
 
         Ok(ConnectedMiflora {
             connection,
