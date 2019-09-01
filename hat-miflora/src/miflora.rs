@@ -7,13 +7,13 @@ static DATA_CHAR_UUID: &'static str = "00001a01-0000-1000-8000-00805f9b34fb";
 static DEVICE_MODE_REALTIME: [u8; 2] = [0xa0, 0x1f];
 static DEVICE_MODE_BLINK: [u8; 2] = [0xfd, 0xff];
 
+static DBUS_METHOD_TIMEOUT : i32 = 20_000;
+
 use std::error;
 use std::fmt;
 
 use std::io::Cursor;
 use std::ops::Drop;
-use std::thread;
-use std::time::Duration;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
@@ -82,7 +82,7 @@ impl Miflora {
     pub fn connect<'a>(&self) -> Result<ConnectedMiflora, AppError> {
         let device = self
             .connection
-            .with_path(SERVICE_NAME, self.device_path.clone(), 5000);
+            .with_path(SERVICE_NAME, self.device_path.clone(), DBUS_METHOD_TIMEOUT);
 
         device.connect().map_err(|err| AppError::DBusDeviceScanConnectError(err))?;
         device
@@ -204,7 +204,7 @@ impl ConnectedMiflora {
     ) -> Result<ConnectedMiflora, AppError> {
         let connection =
             Connection::get_private(BusType::System).map_err(|err| AppError::DBusConnectError(err))?;
-        let device = connection.with_path(SERVICE_NAME, device_objpath.clone(), 10000);
+        let device = connection.with_path(SERVICE_NAME, device_objpath.clone(), DBUS_METHOD_TIMEOUT);
 
         device.connect().map_err(|err| AppError::DBusDeviceConnectError(err))?;
 
@@ -220,7 +220,7 @@ impl ConnectedMiflora {
     pub fn get_address(&self) -> Result<String, AppError> {
         let device = self
             .connection
-            .with_path(SERVICE_NAME, self.device_objpath.clone(), 5000);
+            .with_path(SERVICE_NAME, self.device_objpath.clone(), DBUS_METHOD_TIMEOUT);
         device
             .get_address()
             .map_err(|err| AppError::DBusReadingPropertyError(err, "address"))
@@ -229,7 +229,7 @@ impl ConnectedMiflora {
     pub fn get_name(&self) -> Result<String, AppError> {
         let device = self
             .connection
-            .with_path(SERVICE_NAME, self.device_objpath.clone(), 5000);
+            .with_path(SERVICE_NAME, self.device_objpath.clone(), DBUS_METHOD_TIMEOUT);
         device
             .get_alias()
             .map_err(|err| AppError::DBusReadingPropertyError(err, "alias"))
@@ -255,7 +255,7 @@ impl ConnectedMiflora {
 
         let value = self
             .connection
-            .with_path(SERVICE_NAME, &self.data_objpath, 5000)
+            .with_path(SERVICE_NAME, &self.data_objpath, DBUS_METHOD_TIMEOUT)
             .read_value(std::collections::HashMap::new())
             .map_err(|_| AppError::ReadingDataValues)?;
 
@@ -280,7 +280,7 @@ impl ConnectedMiflora {
 
         let value = self
             .connection
-            .with_path(SERVICE_NAME, &self.firmware_objpath, 5000)
+            .with_path(SERVICE_NAME, &self.firmware_objpath, DBUS_METHOD_TIMEOUT)
             .read_value(std::collections::HashMap::new())
             .map_err(|_| AppError::ReadingFirmwareDataError)?;
         if value.len() != 7 {
@@ -296,7 +296,7 @@ impl ConnectedMiflora {
 
         let value = self
             .connection
-            .with_path(SERVICE_NAME, &self.data_objpath, 5000)
+            .with_path(SERVICE_NAME, &self.data_objpath, DBUS_METHOD_TIMEOUT)
             .read_value(std::collections::HashMap::new())
             .map_err(|_| AppError::ReadingMifloraDataError)?;
         let serial = hex::encode(value);
@@ -326,7 +326,7 @@ impl ConnectedMiflora {
     fn set_device_mode(&self, command: [u8; 2], debug: bool) -> Result<(), AppError> {
         let device_mode_char =
             self.connection
-                .with_path(SERVICE_NAME, &self.device_mode_objpath, 5000);
+                .with_path(SERVICE_NAME, &self.device_mode_objpath, DBUS_METHOD_TIMEOUT);
 
         device_mode_char
             .write_value(command.to_vec(), std::collections::HashMap::new())
@@ -351,7 +351,7 @@ impl Drop for ConnectedMiflora {
     fn drop(&mut self) {
         let device = self
             .connection
-            .with_path(SERVICE_NAME, self.device_objpath.clone(), 5000);
+            .with_path(SERVICE_NAME, self.device_objpath.clone(), DBUS_METHOD_TIMEOUT);
 
         device.disconnect().ok();
     }
