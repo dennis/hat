@@ -30,12 +30,15 @@ use dbus_common::utils::get_managed_objects_with_interface;
 
 #[derive(Debug)]
 pub enum AppError {
-    DBusConnectError,
-    DeviceConnectError,
-    DeviceDisconnectError,
-    DeviceModeChangeError,
-    ReadingPropertyError,
-    BlinkError,
+    DBusConnectError(dbus::Error),
+    DBusDeviceConnectError(dbus::Error),
+    DBusDeviceModeConfirmError,
+    DBusDeviceModeReadError(dbus::Error),
+    DBusDeviceModeWriteError(dbus::Error),
+    DBusDeviceScanConnectError(dbus::Error),
+    DBusDeviceScanDisconnectError(dbus::Error),
+    DBusReadingPropertyError(dbus::Error, &'static str),
+    BlinkError(Box<AppError>),
     JSONError,
     ReadingMifloraDataError,
     ReadingMifloraVersionError,
@@ -71,7 +74,7 @@ impl Miflora {
     pub fn new(device_path: String) -> Result<Miflora, AppError> {
         Ok(Miflora {
             connection: Connection::get_private(BusType::System)
-                .map_err(|_| AppError::DBusConnectError)?,
+                .map_err(|err| AppError::DBusConnectError(err))?,
             device_path,
         })
     }
@@ -81,10 +84,10 @@ impl Miflora {
             .connection
             .with_path(SERVICE_NAME, self.device_path.clone(), 5000);
 
-        device.connect().map_err(|_| AppError::DeviceConnectError)?;
+        device.connect().map_err(|err| AppError::DBusDeviceScanConnectError(err))?;
         device
             .disconnect()
-            .map_err(|_| AppError::DeviceDisconnectError)?;
+            .map_err(|err| AppError::DBusDeviceScanDisconnectError(err))?;
 
         let services = get_managed_objects_with_interface(
             &self.connection,
@@ -200,10 +203,10 @@ impl ConnectedMiflora {
         data_objpath: &str,
     ) -> Result<ConnectedMiflora, AppError> {
         let connection =
-            Connection::get_private(BusType::System).map_err(|_| AppError::DBusConnectError)?;
-        let device = connection.with_path(SERVICE_NAME, device_objpath.clone(), 5000);
+            Connection::get_private(BusType::System).map_err(|err| AppError::DBusConnectError(err))?;
+        let device = connection.with_path(SERVICE_NAME, device_objpath.clone(), 10000);
 
-        device.connect().map_err(|_| AppError::DeviceConnectError)?;
+        device.connect().map_err(|err| AppError::DBusDeviceConnectError(err))?;
         thread::sleep(Duration::from_millis(5000));
 
         Ok(ConnectedMiflora {
@@ -221,7 +224,7 @@ impl ConnectedMiflora {
             .with_path(SERVICE_NAME, self.device_objpath.clone(), 5000);
         device
             .get_address()
-            .map_err(|_| AppError::ReadingPropertyError)
+            .map_err(|err| AppError::DBusReadingPropertyError(err, "address"))
     }
 
     pub fn get_name(&self) -> Result<String, AppError> {
@@ -230,7 +233,7 @@ impl ConnectedMiflora {
             .with_path(SERVICE_NAME, self.device_objpath.clone(), 5000);
         device
             .get_alias()
-            .map_err(|_| AppError::ReadingPropertyError)
+            .map_err(|err| AppError::DBusReadingPropertyError(err, "alias"))
     }
 
     pub fn blink(&self, debug: bool) -> Result<(), AppError> {
@@ -239,7 +242,7 @@ impl ConnectedMiflora {
         }
 
         self.set_device_mode(DEVICE_MODE_BLINK, debug)
-            .map_err(|_| AppError::BlinkError)?;
+            .map_err(|err| AppError::BlinkError(Box::new(err)))?;
 
         Ok(())
     }
@@ -328,17 +331,17 @@ impl ConnectedMiflora {
 
         device_mode_char
             .write_value(command.to_vec(), std::collections::HashMap::new())
-            .map_err(|_| AppError::DeviceModeChangeError)?;
+            .map_err(|err| AppError::DBusDeviceModeWriteError(err))?;
 
         if device_mode_char
             .read_value(std::collections::HashMap::new())
-            .map_err(|_| AppError::DeviceModeChangeError)?
+            .map_err(|err| AppError::DBusDeviceModeReadError(err))?
             != command
         {
             if debug {
                 eprintln!("  Unexpected value from command char. uuid");
             }
-            return Err(AppError::DeviceModeChangeError);
+            return Err(AppError::DBusDeviceModeConfirmError);
         }
 
         Ok(())
