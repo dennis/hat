@@ -7,20 +7,22 @@ static DATA_CHAR_UUID: &'static str = "00001a01-0000-1000-8000-00805f9b34fb";
 static DEVICE_MODE_REALTIME: [u8; 2] = [0xa0, 0x1f];
 static DEVICE_MODE_BLINK: [u8; 2] = [0xfd, 0xff];
 
-static DBUS_METHOD_TIMEOUT : i32 = 20_000;
+static DBUS_METHOD_TIMEOUT: i32 = 20_000;
 
 use std::error;
 use std::fmt;
 
 use std::io::Cursor;
 use std::ops::Drop;
+use std::rc::Rc;
+use std::{thread, time};
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
 use chrono::prelude::*;
 use serde::Serialize;
 
-use dbus::{BusType, Connection, MessageItem};
+use dbus::{Connection, MessageItem};
 
 use dbus_common::org_bluez_device1::OrgBluezDevice1;
 use dbus_common::org_bluez_gatt_characteristic1::OrgBluezGattCharacteristic1;
@@ -30,7 +32,6 @@ use dbus_common::utils::get_managed_objects_with_interface;
 
 #[derive(Debug)]
 pub enum AppError {
-    DBusConnectError(dbus::Error),
     DBusDeviceConnectError(dbus::Error),
     DBusDeviceModeConfirmError,
     DBusDeviceModeReadError(dbus::Error),
@@ -67,24 +68,25 @@ impl fmt::Display for AppError {
 #[derive(Debug)]
 pub struct Miflora {
     device_path: String,
-    connection: Connection,
+    connection: Rc<Connection>,
 }
 
 impl Miflora {
-    pub fn new(device_path: String) -> Result<Miflora, AppError> {
+    pub fn new(device_path: String, connection: Rc<Connection>) -> Result<Miflora, AppError> {
         Ok(Miflora {
-            connection: Connection::get_private(BusType::System)
-                .map_err(|err| AppError::DBusConnectError(err))?,
+            connection,
             device_path,
         })
     }
 
     pub fn connect<'a>(&self) -> Result<ConnectedMiflora, AppError> {
-        let device = self
-            .connection
-            .with_path(SERVICE_NAME, self.device_path.clone(), DBUS_METHOD_TIMEOUT);
+        let device =
+            self.connection
+                .with_path(SERVICE_NAME, self.device_path.clone(), DBUS_METHOD_TIMEOUT);
 
-        device.connect().map_err(|err| AppError::DBusDeviceScanConnectError(err))?;
+        device
+            .connect()
+            .map_err(|err| AppError::DBusDeviceScanConnectError(err))?;
         device
             .disconnect()
             .map_err(|err| AppError::DBusDeviceScanDisconnectError(err))?;
@@ -122,6 +124,7 @@ impl Miflora {
             .ok_or(AppError::CantFindDataCharacteristicUuid)?;
 
         ConnectedMiflora::new(
+            self.connection.clone(),
             &self.device_path,
             firmware_char,
             device_mode_char,
@@ -188,7 +191,7 @@ fn find_characteristic(connection: &Connection, path: &str, uuid: &str) -> bool 
 
 #[derive(Debug)]
 pub struct ConnectedMiflora {
-    connection: Connection,
+    connection: Rc<Connection>,
     device_objpath: String,
     firmware_objpath: String,
     device_mode_objpath: String,
@@ -197,16 +200,18 @@ pub struct ConnectedMiflora {
 
 impl ConnectedMiflora {
     pub fn new(
+        connection: Rc<Connection>,
         device_objpath: &str,
         firmware_objpath: &str,
         device_mode_objpath: &str,
         data_objpath: &str,
     ) -> Result<ConnectedMiflora, AppError> {
-        let connection =
-            Connection::get_private(BusType::System).map_err(|err| AppError::DBusConnectError(err))?;
-        let device = connection.with_path(SERVICE_NAME, device_objpath.clone(), DBUS_METHOD_TIMEOUT);
+        let device =
+            connection.with_path(SERVICE_NAME, device_objpath.clone(), DBUS_METHOD_TIMEOUT);
 
-        device.connect().map_err(|err| AppError::DBusDeviceConnectError(err))?;
+        device
+            .connect()
+            .map_err(|err| AppError::DBusDeviceConnectError(err))?;
 
         Ok(ConnectedMiflora {
             connection,
@@ -218,18 +223,22 @@ impl ConnectedMiflora {
     }
 
     pub fn get_address(&self) -> Result<String, AppError> {
-        let device = self
-            .connection
-            .with_path(SERVICE_NAME, self.device_objpath.clone(), DBUS_METHOD_TIMEOUT);
+        let device = self.connection.with_path(
+            SERVICE_NAME,
+            self.device_objpath.clone(),
+            DBUS_METHOD_TIMEOUT,
+        );
         device
             .get_address()
             .map_err(|err| AppError::DBusReadingPropertyError(err, "address"))
     }
 
     pub fn get_name(&self) -> Result<String, AppError> {
-        let device = self
-            .connection
-            .with_path(SERVICE_NAME, self.device_objpath.clone(), DBUS_METHOD_TIMEOUT);
+        let device = self.connection.with_path(
+            SERVICE_NAME,
+            self.device_objpath.clone(),
+            DBUS_METHOD_TIMEOUT,
+        );
         device
             .get_alias()
             .map_err(|err| AppError::DBusReadingPropertyError(err, "alias"))
@@ -349,9 +358,11 @@ impl ConnectedMiflora {
 
 impl Drop for ConnectedMiflora {
     fn drop(&mut self) {
-        let device = self
-            .connection
-            .with_path(SERVICE_NAME, self.device_objpath.clone(), DBUS_METHOD_TIMEOUT);
+        let device = self.connection.with_path(
+            SERVICE_NAME,
+            self.device_objpath.clone(),
+            DBUS_METHOD_TIMEOUT,
+        );
 
         device.disconnect().ok();
     }

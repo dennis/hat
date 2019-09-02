@@ -1,6 +1,7 @@
 static ROOT_SERVICE_UUID: &'static str = "0000fe95-0000-1000-8000-00805f9b34fb";
 
 use std::error::Error;
+use std::rc::Rc;
 
 use dbus::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
 use dbus::{BusType, Connection, SignalArgs};
@@ -11,12 +12,12 @@ use crate::Miflora;
 
 pub struct Scanner<'a> {
     cli: &'a Cli,
-    connection: Connection,
+    connection: Rc<Connection>,
 }
 
 impl<'a> Scanner<'a> {
     pub fn new(cli: &'a Cli) -> Result<Scanner, Box<Error>> {
-        let connection = Connection::get_private(BusType::System)?;
+        let connection = Rc::new(Connection::get_private(BusType::System)?);
 
         Ok(Scanner { cli, connection })
     }
@@ -32,7 +33,7 @@ impl<'a> Scanner<'a> {
         let devices = processor
             .process_known_devices(&self.connection)?
             .iter()
-            .filter_map(|device| Miflora::new(device.clone()).ok())
+            .filter_map(|device| Miflora::new(device.clone(), self.connection.clone()).ok())
             .collect();
 
         Ok(devices)
