@@ -15,7 +15,6 @@ use std::fmt;
 use std::io::Cursor;
 use std::ops::Drop;
 use std::rc::Rc;
-use std::{thread, time};
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
@@ -87,6 +86,7 @@ impl Miflora {
         device
             .connect()
             .map_err(|err| AppError::DBusDeviceScanConnectError(err))?;
+
         device
             .disconnect()
             .map_err(|err| AppError::DBusDeviceScanDisconnectError(err))?;

@@ -1,7 +1,7 @@
 use dbus::arg::RefArg;
 use dbus::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
 use dbus::MessageType::Signal;
-use dbus::{BusType, Connection, ConnectionItem, Message, MessageItem, SignalArgs};
+use dbus::{BusType, Connection, ConnectionItem, SignalArgs};
 use std::boxed::Box;
 use std::error::Error;
 use std::time::SystemTime;
