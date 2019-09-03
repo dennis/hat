@@ -1,20 +1,18 @@
 use dbus::arg::RefArg;
 use dbus::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
 use dbus::MessageType::Signal;
-use dbus::{BusType, Connection, ConnectionItem, Message, MessageItem, SignalArgs};
+use dbus::{BusType, Connection, ConnectionItem, SignalArgs};
 use std::boxed::Box;
 use std::error::Error;
 use std::time::SystemTime;
 use std::time::Duration;
 
 use crate::cli::Cli;
-use crate::org_bluez_adapter1::OrgBluezAdapter1;
-use crate::org_bluez_device1::OrgFreedesktopDBusProperties;
+use dbus_common::org_bluez_adapter1::OrgBluezAdapter1;
+use dbus_common::org_bluez_device1::OrgFreedesktopDBusProperties;
+use dbus_common::utils::{SERVICE_NAME, DEVICE_INTERFACE, get_adapter};
 use crate::weight_data::WeightData;
 
-static ADAPTER_INTERFACE: &'static str = "org.bluez.Adapter1";
-static DEVICE_INTERFACE: &'static str = "org.bluez.Device1";
-static SERVICE_NAME: &'static str = "org.bluez";
 static BODY_COMPOSITION_UUID: &'static str = "0000181b-0000-1000-8000-00805f9b34fb";
 
 pub struct Scanner<'a> {
@@ -36,7 +34,7 @@ impl<'a> Scanner<'a> {
         let now = SystemTime::now();
         let adapter = self
             .connection
-            .with_path(SERVICE_NAME, self.get_adapter()?, 1000);
+            .with_path(SERVICE_NAME, get_adapter(&self.connection)?, 1000);
 
         let mut last_weight_data_seen = SystemTime::now();
         let mut last_weight_data : Option<WeightData> = None;
@@ -98,36 +96,6 @@ impl<'a> Scanner<'a> {
         Ok(())
     }
 
-    fn get_adapter(&self) -> Result<String, Box<Error>> {
-        let adapters = self.get_adapters()?;
-
-        if adapters.is_empty() {
-            return Err(Box::from("Bluetooth adapter not found"));
-        }
-
-        Ok(adapters[0].clone())
-    }
-
-    fn get_adapters(&self) -> Result<Vec<String>, Box<Error>> {
-        let mut adapters: Vec<String> = Vec::new();
-        let objects: Vec<MessageItem> = self.get_managed_objects()?;
-        let z: &[MessageItem] = objects.get(0).unwrap().inner().unwrap();
-
-        for y in z {
-            let (path, interfaces) = y.inner().unwrap();
-            let x: &[MessageItem] = interfaces.inner().unwrap();
-            for interface in x {
-                let (i, _) = interface.inner().unwrap();
-                let name: &str = i.inner().unwrap();
-                if name == ADAPTER_INTERFACE {
-                    let p: &str = path.inner().unwrap();
-                    adapters.push(String::from(p));
-                }
-            }
-        }
-        Ok(adapters)
-    }
-
     fn handle_signal(&self, signal: &dbus::Message) -> Result<Option<WeightData>, Box<Error>> {
         let (message_type, path, interface, member) = signal.headers();
 
@@ -145,19 +113,6 @@ impl<'a> Scanner<'a> {
             }
         }
         Ok(None)
-    }
-
-    fn get_managed_objects(&self) -> Result<Vec<MessageItem>, Box<Error>> {
-        let m = Message::new_method_call(
-            SERVICE_NAME,
-            "/",
-            "org.freedesktop.DBus.ObjectManager",
-            "GetManagedObjects",
-        )?;
-
-        let r = self.connection.send_with_reply_and_block(m, 1000)?;
-
-        Ok(r.get_items())
     }
 
     fn inquiry_changed_properties(

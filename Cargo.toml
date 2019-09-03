@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+  "dbus-common",
   "hat-mibcs",
   "hat-miflora"
 ]

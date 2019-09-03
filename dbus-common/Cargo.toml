@@ -1,0 +1,8 @@
+[package]
+name = "dbus-common"
+version = "0.1.0"
+authors = ["Dennis Møllegaard Pedersen <dennis@moellegaard.dk>"]
+edition = "2018"
+
+[dependencies]
+dbus = "0.6.4"

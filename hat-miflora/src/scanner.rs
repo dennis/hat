@@ -1,71 +1,41 @@
 static ROOT_SERVICE_UUID: &'static str = "0000fe95-0000-1000-8000-00805f9b34fb";
 
 use std::error::Error;
+use std::rc::Rc;
 
-use std::thread;
-use std::time::Duration;
-
-use blurz::bluetooth_adapter::BluetoothAdapter as Adapter;
-use blurz::bluetooth_device::BluetoothDevice as Device;
-use blurz::bluetooth_discovery_session::BluetoothDiscoverySession as DiscoverySession;
-use blurz::bluetooth_session::BluetoothSession as Session;
+use dbus::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
+use dbus::{BusType, Connection, SignalArgs};
+use dbus_common::dbus_processor::DbusProcessor;
 
 use crate::Cli;
 use crate::Miflora;
 
 pub struct Scanner<'a> {
-    cli : &'a Cli,
+    cli: &'a Cli,
+    connection: Rc<Connection>,
 }
 
 impl<'a> Scanner<'a> {
-    pub fn new(cli : &'a Cli) -> Scanner {
-        Scanner { cli }
+    pub fn new(cli: &'a Cli) -> Result<Scanner, Box<Error>> {
+        let connection = Rc::new(Connection::get_private(BusType::System)?);
+
+        Ok(Scanner { cli, connection })
     }
 
-    pub fn find_mifloras(&self, bt_session : &Session) -> Result<Vec<Miflora>, Box<Error>> {
-        let adapter: Adapter = Adapter::init(bt_session)?;
-        let session = DiscoverySession::create_session(
-            &bt_session,
-            adapter.get_id()
-        )?;
+    pub fn find_mifloras(&self) -> Result<Vec<Miflora>, Box<Error>> {
+        self.connection
+            .add_match(&PropertiesPropertiesChanged::match_str(None, None))?;
 
-        session.start_discovery()?;
-        thread::sleep(Duration::from_millis(1000));
-        session.stop_discovery()?;
-
-        let devices = adapter.get_device_list()?;
-
-        let mifloras : Vec<Miflora> = devices
+        let mut processor = DbusProcessor {
+            root_service_uuid: ROOT_SERVICE_UUID.to_string(),
+            debug: self.cli.debug,
+        };
+        let devices = processor
+            .process_known_devices(&self.connection)?
             .iter()
-            .filter( |&device| self.is_miflora(bt_session, device) )
-            .map( |device| Miflora::new(device.clone()) )
+            .filter_map(|device| Miflora::new(device.clone(), self.connection.clone()).ok())
             .collect();
 
-        if self.cli.debug { eprintln!("found mifloras: {:?}", mifloras) }
-
-        Ok(mifloras)
-    }
-
-    fn is_miflora(&self, bt_session : &Session, device_path : &String) -> bool {
-        if let Ok(result) = self.look_for_root_device(bt_session, device_path) {
-            if self.cli.debug { eprintln!("is_miflora: {:?} = {:?}", device_path, if result { "yes" } else { "no" }); }
-            return result;
-        }
-        else {
-            if self.cli.debug { eprintln!("is_miflora: {:?} = error getting data", device_path); }
-            return false;
-        }
-    }
-
-    fn look_for_root_device(&self, bt_session : &Session, device_path : &String) -> Result<bool, Box<Error>> {
-        let device = Device::new(bt_session, device_path.clone());
-        let uuids = device.get_uuids()?;
-        'uuid_loop: for uuid in uuids {
-            if uuid == ROOT_SERVICE_UUID {
-                return Ok(true)
-            }
-        }
-
-        Ok(false)
+        Ok(devices)
     }
 }
