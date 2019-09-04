@@ -80,6 +80,3 @@ pub fn get_adapter(connection : &Connection) -> Result<String, Box<Error>> {
 
     Ok(adapters[0].clone())
 }
-
-// pub fn get_get_gatt_services(connection : &Connection) -> Result<Vec<String>, Box<Error>> {
-// }

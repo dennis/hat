@@ -39,23 +39,58 @@ This will publish the measurements to MQTT under the `miscale` topic, where
 Home Assistant, OpenHab or Node-Red can do further processing of data.
 
 ## hat-miflora
-`hat-miflora` is a tool for reading data from Xiaomi Miflora sensor. It will
-connect and query all reachable Miflora sensor and output the data retrieved as
-JSON.
+`hat-miflora` is a tool for reading data from Xiaomi Miflora sensor.
 
 NOTICE: This have only been tested with version 3.1.8+ firmware
 
 It will only fetch data once. If you want to have it gather every hour or
 similar, then add it to your crontab.
 
-### Example
-The following example shows the output from Miflora I get here at my desk.
+### Examples
 
+Scan of Mifloras:
 ```
-hat-miflora
-{"source":"hat-miflora","name":"Flower care","address":"C4:7C:8D:65:BD:8B","datetime":"2019-07-30 18:45:23","temperature":25.6,"lux":113,"moisture":14,"conductivity":146,"battery":98,"version":"3.1.9","serial":"65bd8b14d57490c1192c97a70f398da4"}
-
+$ hat-miflora scan
+- addr: "C4:7C:8D:65:BD:8B"
+  name: "Flower care"
+  alias: "Flower care"
+- addr: "C4:7C:8D:67:C2:8B"
+  name: "Flower care"
+  alias: "Flower care"
 ```
 
-As with `hat-mibcs`, use `mosquitto_pub` to publish the json to MQTT.
+If you wish, you can get the same output as JSON.
+```
+$ hat-miflora --json scan
+{"devices":[{"addr":"C4:7C:8D:67:C2:8B","name":"Flower care","alias":"Flower care"},{"addr":"C4:7C:8D:65:BD:8B","name":"Flower care","alias":"Flower care"}]}
+```
 
+Reading data from a device
+```
+$ hat-miflora --json read C4:7C:8D:67:C2:8B
+{"address":"C4:7C:8D:67:C2:8B","battery_pct":98,"firmware_version":"3.1.9","temperature":23.9,"lux":112,"moisture":0,"conductivity":0}
+```
+
+For help and info:
+```
+$ hat-miflora
+hat-miflora 0.4.0
+
+USAGE:
+    hat-miflora [FLAGS] <SUBCOMMAND>
+
+FLAGS:
+    -h, --help          Prints help information
+    -j, --json          Output JSON
+    -H, --no-headers    Don't show headers (ignored for JSON output)
+    -V, --version       Prints version information
+
+SUBCOMMANDS:
+    blink            Make Miflora device blink
+    help             Prints this message or the help of the given subcommand(s)
+    history          Read historical data from Miflora device
+    history-clear    Clear historical data from Miflora device
+    history-count    Read number of historical records from Miflora Device
+    read             Read realtime data from Miflora device
+    scan             Scan for Miflora Devices
+```

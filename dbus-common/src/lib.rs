@@ -2,6 +2,7 @@ pub mod org_bluez_adapter1;
 pub mod org_bluez_device1;
 pub mod org_bluez_gatt_service1;
 pub mod org_bluez_gatt_characteristic1;
+pub mod org_bluez_gatt_descriptor1;
 pub mod utils;
 pub mod dbus_processor;
 
