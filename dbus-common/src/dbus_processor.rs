@@ -12,7 +12,7 @@ pub struct DbusProcessor {
 
 impl DbusProcessor {
     // This will return known devices (no scanning)
-    pub fn process_known_devices(&mut self, connection : &Connection) -> Result<Vec<String>, Box<Error>> {
+    pub fn process_known_devices(&mut self, connection : &Connection) -> Result<Vec<String>, Box<dyn Error>> {
         if self.debug { eprintln!("Scanning for known devices"); }
 
         let r : Vec<String> =
@@ -25,7 +25,7 @@ impl DbusProcessor {
         Ok(r)
     }
 
-    fn probe_device(&mut self, connection: &Connection, path: &String) -> Result<bool, Box<Error>> {
+    fn probe_device(&mut self, connection: &Connection, path: &String) -> Result<bool, Box<dyn Error>> {
         let device = connection.with_path(SERVICE_NAME, path, 1000);
         let properties = device.get_all(DEVICE_INTERFACE)?;
 

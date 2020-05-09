@@ -6,7 +6,7 @@ pub static SERVICE_NAME: &'static str = "org.bluez";
 pub static ADAPTER_INTERFACE: &'static str = "org.bluez.Adapter1";
 pub static DEVICE_INTERFACE: &'static str = "org.bluez.Device1";
 
-fn get_managed_objects(service_name : &str, connection : &Connection) -> Result<Vec<MessageItem>, Box<Error>> {
+fn get_managed_objects(service_name : &str, connection : &Connection) -> Result<Vec<MessageItem>, Box<dyn Error>> {
     let m = Message::new_method_call(
         service_name,
         "/",
@@ -24,7 +24,7 @@ pub fn get_managed_objects_with_interface(
     requested_interface : &str,
     requested_path : &str,
     requested_property : &str,
-    ) -> Result<Vec<String>, Box<Error>> {
+    ) -> Result<Vec<String>, Box<dyn Error>> {
     let mut r: Vec<String> = Vec::new();
     let objects: Vec<MessageItem> = get_managed_objects(SERVICE_NAME, connection)?;
     let z: &[MessageItem] = objects.get(0).unwrap().inner().unwrap();
@@ -62,16 +62,16 @@ pub fn get_property(
     interface: &str,
     object_path: &str,
     property_name: &str,
-    ) -> Result<MessageItem, Box<Error>> {
+    ) -> Result<MessageItem, Box<dyn Error>> {
     let p = Props::new(&connection, SERVICE_NAME, object_path, interface, 1000);
     Ok(p.get(property_name)?.clone())
 }
 
-fn get_adapters(connection : &Connection) -> Result<Vec<String>, Box<Error>> {
+fn get_adapters(connection : &Connection) -> Result<Vec<String>, Box<dyn Error>> {
     get_managed_objects_with_interface(connection, &ADAPTER_INTERFACE, "", "")
 }
 
-pub fn get_adapter(connection : &Connection) -> Result<String, Box<Error>> {
+pub fn get_adapter(connection : &Connection) -> Result<String, Box<dyn Error>> {
     let adapters = get_adapters(connection)?;
 
     if adapters.is_empty() {

@@ -23,10 +23,10 @@ impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgFreedesktopDBusIntros
 
 pub trait OrgBluezGattCharacteristic1 {
     type Err;
-    fn read_value(&self, options: ::std::collections::HashMap<&str, arg::Variant<Box<arg::RefArg>>>) -> Result<Vec<u8>, Self::Err>;
-    fn write_value(&self, value: Vec<u8>, options: ::std::collections::HashMap<&str, arg::Variant<Box<arg::RefArg>>>) -> Result<(), Self::Err>;
-    fn acquire_write(&self, options: ::std::collections::HashMap<&str, arg::Variant<Box<arg::RefArg>>>) -> Result<(dbus::OwnedFd, u16), Self::Err>;
-    fn acquire_notify(&self, options: ::std::collections::HashMap<&str, arg::Variant<Box<arg::RefArg>>>) -> Result<(dbus::OwnedFd, u16), Self::Err>;
+    fn read_value(&self, options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<Vec<u8>, Self::Err>;
+    fn write_value(&self, value: Vec<u8>, options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<(), Self::Err>;
+    fn acquire_write(&self, options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<(dbus::OwnedFd, u16), Self::Err>;
+    fn acquire_notify(&self, options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<(dbus::OwnedFd, u16), Self::Err>;
     fn start_notify(&self) -> Result<(), Self::Err>;
     fn stop_notify(&self) -> Result<(), Self::Err>;
     fn get_uuid(&self) -> Result<String, Self::Err>;
@@ -41,7 +41,7 @@ pub trait OrgBluezGattCharacteristic1 {
 impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgBluezGattCharacteristic1 for dbus::ConnPath<'a, C> {
     type Err = dbus::Error;
 
-    fn read_value(&self, options: ::std::collections::HashMap<&str, arg::Variant<Box<arg::RefArg>>>) -> Result<Vec<u8>, Self::Err> {
+    fn read_value(&self, options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<Vec<u8>, Self::Err> {
         let mut m = self.method_call_with_args(&"org.bluez.GattCharacteristic1".into(), &"ReadValue".into(), |msg| {
             let mut i = arg::IterAppend::new(msg);
             i.append(options);
@@ -52,7 +52,7 @@ impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgBluezGattCharacterist
         Ok(value)
     }
 
-    fn write_value(&self, value: Vec<u8>, options: ::std::collections::HashMap<&str, arg::Variant<Box<arg::RefArg>>>) -> Result<(), Self::Err> {
+    fn write_value(&self, value: Vec<u8>, options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<(), Self::Err> {
         let mut m = self.method_call_with_args(&"org.bluez.GattCharacteristic1".into(), &"WriteValue".into(), |msg| {
             let mut i = arg::IterAppend::new(msg);
             i.append(value);
@@ -62,7 +62,7 @@ impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgBluezGattCharacterist
         Ok(())
     }
 
-    fn acquire_write(&self, options: ::std::collections::HashMap<&str, arg::Variant<Box<arg::RefArg>>>) -> Result<(dbus::OwnedFd, u16), Self::Err> {
+    fn acquire_write(&self, options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<(dbus::OwnedFd, u16), Self::Err> {
         let mut m = self.method_call_with_args(&"org.bluez.GattCharacteristic1".into(), &"AcquireWrite".into(), |msg| {
             let mut i = arg::IterAppend::new(msg);
             i.append(options);
@@ -74,7 +74,7 @@ impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgBluezGattCharacterist
         Ok((fd, mtu))
     }
 
-    fn acquire_notify(&self, options: ::std::collections::HashMap<&str, arg::Variant<Box<arg::RefArg>>>) -> Result<(dbus::OwnedFd, u16), Self::Err> {
+    fn acquire_notify(&self, options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<(dbus::OwnedFd, u16), Self::Err> {
         let mut m = self.method_call_with_args(&"org.bluez.GattCharacteristic1".into(), &"AcquireNotify".into(), |msg| {
             let mut i = arg::IterAppend::new(msg);
             i.append(options);
@@ -133,7 +133,7 @@ pub trait OrgFreedesktopDBusProperties {
     type Err;
     fn get<R0: for<'b> arg::Get<'b>>(&self, interface: &str, name: &str) -> Result<arg::Variant<R0>, Self::Err>;
     fn set<I2: arg::Arg + arg::Append>(&self, interface: &str, name: &str, value: arg::Variant<I2>) -> Result<(), Self::Err>;
-    fn get_all(&self, interface: &str) -> Result<::std::collections::HashMap<String, arg::Variant<Box<arg::RefArg + 'static>>>, Self::Err>;
+    fn get_all(&self, interface: &str) -> Result<::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>, Self::Err>;
 }
 
 impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgFreedesktopDBusProperties for dbus::ConnPath<'a, C> {
@@ -162,14 +162,14 @@ impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgFreedesktopDBusProper
         Ok(())
     }
 
-    fn get_all(&self, interface: &str) -> Result<::std::collections::HashMap<String, arg::Variant<Box<arg::RefArg + 'static>>>, Self::Err> {
+    fn get_all(&self, interface: &str) -> Result<::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>, Self::Err> {
         let mut m = self.method_call_with_args(&"org.freedesktop.DBus.Properties".into(), &"GetAll".into(), |msg| {
             let mut i = arg::IterAppend::new(msg);
             i.append(interface);
         })?;
         m.as_result()?;
         let mut i = m.iter_init();
-        let properties: ::std::collections::HashMap<String, arg::Variant<Box<arg::RefArg + 'static>>> = i.read()?;
+        let properties: ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>> = i.read()?;
         Ok(properties)
     }
 }
@@ -177,7 +177,7 @@ impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgFreedesktopDBusProper
 #[derive(Debug, Default)]
 pub struct OrgFreedesktopDBusPropertiesPropertiesChanged {
     pub interface: String,
-    pub changed_properties: ::std::collections::HashMap<String, arg::Variant<Box<arg::RefArg + 'static>>>,
+    pub changed_properties: ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>,
     pub invalidated_properties: Vec<String>,
 }
 
