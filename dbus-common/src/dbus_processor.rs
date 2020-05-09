@@ -4,6 +4,7 @@ use crate::org_bluez_device1::OrgFreedesktopDBusProperties;
 use crate::utils::{SERVICE_NAME, DEVICE_INTERFACE, get_managed_objects_with_interface};
 
 use dbus::Connection;
+use dbus::arg::RefArg;
 
 pub struct DbusProcessor {
     pub root_service_uuid: String,
@@ -41,18 +42,16 @@ impl DbusProcessor {
             eprintln!("    uuids  {:?}", uuids);
         }
 
-        if let dbus::arg::Variant(uuids) = uuids {
-            let iter = (*uuids).as_iter();
+        let iter = uuids.as_iter();
 
-            if iter.is_none() {
-                return Ok(false);
-            }
+        if iter.is_none() {
+            return Ok(false);
+        }
 
-            let mut iter = iter.unwrap();
-            if iter.any(|a| a.as_str() == Some(&self.root_service_uuid)) {
-                if self.debug { eprintln!("    this looks applicable"); }
-                return Ok(true);
-            }
+        let mut iter = iter.unwrap();
+        if iter.any(|a| a.as_str() == Some(&self.root_service_uuid)) {
+            if self.debug { eprintln!("    this looks applicable"); }
+            return Ok(true);
         }
 
         if self.debug { eprintln!("    ignoring"); }

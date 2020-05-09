@@ -134,23 +134,16 @@ impl<'a> Scanner<'a> {
             eprintln!("  uuids  {:?}", uuids);
         }
 
-        if let dbus::arg::Variant(uuids) = uuids {
-            let iter = (*uuids).as_iter();
+        let iter = uuids.as_iter();
 
-            if iter.is_none() {
-                return Ok(None);
-            }
-
-            let mut iter = iter.unwrap();
-
-            if !iter.any(|a| a.as_str() == Some(BODY_COMPOSITION_UUID)) {
-                if self.cli.debug { eprintln!("  discarding due to missing uuid"); }
-
-                return Ok(None);
-            }
+        if iter.is_none() {
+            return Ok(None);
         }
-        else {
-            if self.cli.debug { eprintln!("  discarding - wrong type"); }
+
+        let mut iter = iter.unwrap();
+
+        if !iter.any(|a| a.as_str() == Some(BODY_COMPOSITION_UUID)) {
+            if self.cli.debug { eprintln!("  discarding due to missing uuid"); }
 
             return Ok(None);
         }
