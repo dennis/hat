@@ -17,7 +17,7 @@ pub struct WeightData {
 }
 
 impl WeightData {
-    pub fn decode(value: &Vec<u8>, btaddr: &str, debug : bool) -> Result<WeightData, Box<Error>> {
+    pub fn decode(value: &Vec<u8>, btaddr: &str, debug : bool) -> Result<WeightData, Box<dyn Error>> {
         let mut rdr = Cursor::new(value.clone());
 
         let statusbit0 = rdr.read_u8()?;
@@ -79,7 +79,7 @@ impl WeightData {
         return self.impedance.is_some();
     }
 
-    pub fn dump(&self) -> Result<(), Box<Error>>  {
+    pub fn dump(&self) -> Result<(), Box<dyn Error>>  {
         println!("{}", serde_json::to_string(&self)?);
 
         Ok(())

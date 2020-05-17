@@ -21,13 +21,13 @@ pub struct Scanner<'a> {
 }
 
 impl<'a> Scanner<'a> {
-    pub fn new(cli: &'a Cli) -> Result<Scanner, Box<Error>> {
+    pub fn new(cli: &'a Cli) -> Result<Scanner, Box<dyn Error>> {
         let connection = Connection::get_private(BusType::System)?;
 
         Ok(Scanner { connection, cli })
     }
 
-    pub fn listen_for_signals(&self) -> Result<(), Box<Error>> {
+    pub fn listen_for_signals(&self) -> Result<(), Box<dyn Error>> {
         self.connection
             .add_match(&PropertiesPropertiesChanged::match_str(None, None))?;
 
@@ -96,7 +96,7 @@ impl<'a> Scanner<'a> {
         Ok(())
     }
 
-    fn handle_signal(&self, signal: &dbus::Message) -> Result<Option<WeightData>, Box<Error>> {
+    fn handle_signal(&self, signal: &dbus::Message) -> Result<Option<WeightData>, Box<dyn Error>> {
         let (message_type, path, interface, member) = signal.headers();
 
         if message_type == Signal
@@ -119,7 +119,7 @@ impl<'a> Scanner<'a> {
         &self,
         path: &String,
         item_vec: Vec<dbus::MessageItem>,
-    ) -> Result<Option<WeightData>, Box<Error>> {
+    ) -> Result<Option<WeightData>, Box<dyn Error>> {
         let device = self.connection.with_path(SERVICE_NAME, path, 1000);
         let properties = device.get_all(DEVICE_INTERFACE)?;
 
@@ -179,7 +179,7 @@ impl<'a> Scanner<'a> {
         &self,
         value: &dbus::MessageItem,
         btaddr: &str,
-    ) -> Result<Option<WeightData>, Box<Error>> {
+    ) -> Result<Option<WeightData>, Box<dyn Error>> {
         if let dbus::MessageItem::Array(value) = value {
             for v in value.as_ref() {
                 if let dbus::MessageItem::DictEntry(key, value) = v {
@@ -196,7 +196,7 @@ impl<'a> Scanner<'a> {
         key: &dbus::MessageItem,
         value: &dbus::MessageItem,
         btaddr: &str,
-    ) -> Result<Option<WeightData>, Box<Error>> {
+    ) -> Result<Option<WeightData>, Box<dyn Error>> {
         if let dbus::MessageItem::Str(key) = key {
             if key == "ServiceData" {
                 if self.cli.debug {
@@ -217,7 +217,7 @@ impl<'a> Scanner<'a> {
         key: &dbus::MessageItem,
         value: &dbus::MessageItem,
         btaddr: &str,
-    ) -> Result<Option<WeightData>, Box<Error>> {
+    ) -> Result<Option<WeightData>, Box<dyn Error>> {
         if let dbus::MessageItem::Str(key) = key {
             if self.cli.debug {
                 eprintln!("  service-data uuid : {:?}", key);
