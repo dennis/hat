@@ -24,7 +24,7 @@ impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgFreedesktopDBusIntros
 pub trait OrgBluezAdapter1 {
     type Err;
     fn start_discovery(&self) -> Result<(), Self::Err>;
-    fn set_discovery_filter(&self, properties: ::std::collections::HashMap<&str, arg::Variant<Box<arg::RefArg>>>) -> Result<(), Self::Err>;
+    fn set_discovery_filter(&self, properties: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<(), Self::Err>;
     fn stop_discovery(&self) -> Result<(), Self::Err>;
     fn remove_device(&self, device: dbus::Path) -> Result<(), Self::Err>;
     fn get_discovery_filters(&self) -> Result<Vec<String>, Self::Err>;
@@ -59,7 +59,7 @@ impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgBluezAdapter1 for dbu
         Ok(())
     }
 
-    fn set_discovery_filter(&self, properties: ::std::collections::HashMap<&str, arg::Variant<Box<arg::RefArg>>>) -> Result<(), Self::Err> {
+    fn set_discovery_filter(&self, properties: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<(), Self::Err> {
         let mut m = self.method_call_with_args(&"org.bluez.Adapter1".into(), &"SetDiscoveryFilter".into(), |msg| {
             let mut i = arg::IterAppend::new(msg);
             i.append(properties);
@@ -174,7 +174,7 @@ pub trait OrgFreedesktopDBusProperties {
     type Err;
     fn get<R0: for<'b> arg::Get<'b>>(&self, interface: &str, name: &str) -> Result<arg::Variant<R0>, Self::Err>;
     fn set<I2: arg::Arg + arg::Append>(&self, interface: &str, name: &str, value: arg::Variant<I2>) -> Result<(), Self::Err>;
-    fn get_all(&self, interface: &str) -> Result<::std::collections::HashMap<String, arg::Variant<Box<arg::RefArg + 'static>>>, Self::Err>;
+    fn get_all(&self, interface: &str) -> Result<::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>, Self::Err>;
 }
 
 impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgFreedesktopDBusProperties for dbus::ConnPath<'a, C> {
@@ -203,14 +203,14 @@ impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgFreedesktopDBusProper
         Ok(())
     }
 
-    fn get_all(&self, interface: &str) -> Result<::std::collections::HashMap<String, arg::Variant<Box<arg::RefArg + 'static>>>, Self::Err> {
+    fn get_all(&self, interface: &str) -> Result<::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>, Self::Err> {
         let mut m = self.method_call_with_args(&"org.freedesktop.DBus.Properties".into(), &"GetAll".into(), |msg| {
             let mut i = arg::IterAppend::new(msg);
             i.append(interface);
         })?;
         m.as_result()?;
         let mut i = m.iter_init();
-        let properties: ::std::collections::HashMap<String, arg::Variant<Box<arg::RefArg + 'static>>> = i.read()?;
+        let properties: ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>> = i.read()?;
         Ok(properties)
     }
 }
@@ -218,7 +218,7 @@ impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgFreedesktopDBusProper
 #[derive(Debug, Default)]
 pub struct OrgFreedesktopDBusPropertiesPropertiesChanged {
     pub interface: String,
-    pub changed_properties: ::std::collections::HashMap<String, arg::Variant<Box<arg::RefArg + 'static>>>,
+    pub changed_properties: ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>,
     pub invalidated_properties: Vec<String>,
 }
 
@@ -240,14 +240,14 @@ impl dbus::SignalArgs for OrgFreedesktopDBusPropertiesPropertiesChanged {
 
 pub trait OrgBluezGattManager1 {
     type Err;
-    fn register_application(&self, application: dbus::Path, options: ::std::collections::HashMap<&str, arg::Variant<Box<arg::RefArg>>>) -> Result<(), Self::Err>;
+    fn register_application(&self, application: dbus::Path, options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<(), Self::Err>;
     fn unregister_application(&self, application: dbus::Path) -> Result<(), Self::Err>;
 }
 
 impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgBluezGattManager1 for dbus::ConnPath<'a, C> {
     type Err = dbus::Error;
 
-    fn register_application(&self, application: dbus::Path, options: ::std::collections::HashMap<&str, arg::Variant<Box<arg::RefArg>>>) -> Result<(), Self::Err> {
+    fn register_application(&self, application: dbus::Path, options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<(), Self::Err> {
         let mut m = self.method_call_with_args(&"org.bluez.GattManager1".into(), &"RegisterApplication".into(), |msg| {
             let mut i = arg::IterAppend::new(msg);
             i.append(application);
@@ -269,7 +269,7 @@ impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgBluezGattManager1 for
 
 pub trait OrgBluezLEAdvertisingManager1 {
     type Err;
-    fn register_advertisement(&self, advertisement: dbus::Path, options: ::std::collections::HashMap<&str, arg::Variant<Box<arg::RefArg>>>) -> Result<(), Self::Err>;
+    fn register_advertisement(&self, advertisement: dbus::Path, options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<(), Self::Err>;
     fn unregister_advertisement(&self, service: dbus::Path) -> Result<(), Self::Err>;
     fn get_active_instances(&self) -> Result<u8, Self::Err>;
     fn get_supported_instances(&self) -> Result<u8, Self::Err>;
@@ -279,7 +279,7 @@ pub trait OrgBluezLEAdvertisingManager1 {
 impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgBluezLEAdvertisingManager1 for dbus::ConnPath<'a, C> {
     type Err = dbus::Error;
 
-    fn register_advertisement(&self, advertisement: dbus::Path, options: ::std::collections::HashMap<&str, arg::Variant<Box<arg::RefArg>>>) -> Result<(), Self::Err> {
+    fn register_advertisement(&self, advertisement: dbus::Path, options: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<(), Self::Err> {
         let mut m = self.method_call_with_args(&"org.bluez.LEAdvertisingManager1".into(), &"RegisterAdvertisement".into(), |msg| {
             let mut i = arg::IterAppend::new(msg);
             i.append(advertisement);
@@ -313,16 +313,16 @@ impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgBluezLEAdvertisingMan
 
 pub trait OrgBluezMedia1 {
     type Err;
-    fn register_endpoint(&self, endpoint: dbus::Path, properties: ::std::collections::HashMap<&str, arg::Variant<Box<arg::RefArg>>>) -> Result<(), Self::Err>;
+    fn register_endpoint(&self, endpoint: dbus::Path, properties: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<(), Self::Err>;
     fn unregister_endpoint(&self, endpoint: dbus::Path) -> Result<(), Self::Err>;
-    fn register_player(&self, player: dbus::Path, properties: ::std::collections::HashMap<&str, arg::Variant<Box<arg::RefArg>>>) -> Result<(), Self::Err>;
+    fn register_player(&self, player: dbus::Path, properties: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<(), Self::Err>;
     fn unregister_player(&self, player: dbus::Path) -> Result<(), Self::Err>;
 }
 
 impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgBluezMedia1 for dbus::ConnPath<'a, C> {
     type Err = dbus::Error;
 
-    fn register_endpoint(&self, endpoint: dbus::Path, properties: ::std::collections::HashMap<&str, arg::Variant<Box<arg::RefArg>>>) -> Result<(), Self::Err> {
+    fn register_endpoint(&self, endpoint: dbus::Path, properties: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<(), Self::Err> {
         let mut m = self.method_call_with_args(&"org.bluez.Media1".into(), &"RegisterEndpoint".into(), |msg| {
             let mut i = arg::IterAppend::new(msg);
             i.append(endpoint);
@@ -341,7 +341,7 @@ impl<'a, C: ::std::ops::Deref<Target=dbus::Connection>> OrgBluezMedia1 for dbus:
         Ok(())
     }
 
-    fn register_player(&self, player: dbus::Path, properties: ::std::collections::HashMap<&str, arg::Variant<Box<arg::RefArg>>>) -> Result<(), Self::Err> {
+    fn register_player(&self, player: dbus::Path, properties: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<(), Self::Err> {
         let mut m = self.method_call_with_args(&"org.bluez.Media1".into(), &"RegisterPlayer".into(), |msg| {
             let mut i = arg::IterAppend::new(msg);
             i.append(player);

@@ -17,7 +17,7 @@ pub struct WeightData {
 }
 
 impl WeightData {
-    pub fn decode(value: &Vec<u8>, btaddr: &str, debug : bool) -> Result<WeightData, Box<Error>> {
+    pub fn decode(value: &Vec<u8>, btaddr: &str) -> Result<WeightData, Box<dyn Error>> {
         let mut rdr = Cursor::new(value.clone());
 
         let statusbit0 = rdr.read_u8()?;
@@ -36,20 +36,17 @@ impl WeightData {
         let weight_stabilized: bool = statusbit1 & 0b00100000 != 0;
         let impedance_stabilized: bool = statusbit1 & 0b10000000 != 0;
 
-        if debug {
-            eprintln!("  decoded weight data:");
-            eprintln!("    statusbit0  {:010b}", statusbit0);
-            eprintln!("    statusbit1  {:010b}", statusbit1);
-            eprintln!("    yymmdd      {:?}{:?}{:?}", year, month, day);
-            eprintln!("    hhmmss      {:?}{:?}{:?}", hh, mm, ss);
-            eprintln!("    impedance   {:?}", impedance);
-            eprintln!("    weight      {:?}", weight);
-            eprintln!("      impedance            {:?}", got_impedance);
-            eprintln!("      impedance_stabilized {:?}", impedance_stabilized);
-            eprintln!("      weight               {:?}", got_weight);
-            eprintln!("      weight_stabilized    {:?}", weight_stabilized);
-        }
-
+        debug!("  decoded weight data:");
+        debug!("    statusbit0  {:010b}", statusbit0);
+        debug!("    statusbit1  {:010b}", statusbit1);
+        debug!("    yymmdd      {:?}{:?}{:?}", year, month, day);
+        debug!("    hhmmss      {:?}{:?}{:?}", hh, mm, ss);
+        debug!("    impedance   {:?}", impedance);
+        debug!("    weight      {:?}", weight);
+        debug!("      impedance            {:?}", got_impedance);
+        debug!("      impedance_stabilized {:?}", impedance_stabilized);
+        debug!("      weight               {:?}", got_weight);
+        debug!("      weight_stabilized    {:?}", weight_stabilized);
 
         let weight = if got_weight && weight_stabilized {
             Some(weight)
@@ -79,7 +76,7 @@ impl WeightData {
         return self.impedance.is_some();
     }
 
-    pub fn dump(&self) -> Result<(), Box<Error>>  {
+    pub fn dump(&self) -> Result<(), Box<dyn Error>>  {
         println!("{}", serde_json::to_string(&self)?);
 
         Ok(())
