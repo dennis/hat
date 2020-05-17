@@ -1,7 +1,9 @@
 extern crate byteorder;
 extern crate dbus_common;
-
 extern crate chrono;
+
+#[macro_use]
+extern crate log;
 
 mod cli;
 mod scanner;
@@ -54,6 +56,8 @@ use structopt::StructOpt;
 
 
 fn main() {
+    env_logger::init();
+
     let cli = Cli::from_args();
 
     match Scanner::new(&cli) {

@@ -46,9 +46,10 @@ impl<'a> Scanner<'a> {
                 ConnectionItem::Signal(signal) => {
                     match self.handle_signal(&signal)? {
                         Some(weight_data) => {
-                            if self.cli.debug { eprintln!("  got data, debouncing it"); }
+                            debug!("  got data, debouncing it");
+
                             if weight_data.weight.is_none() {
-                                if self.cli.debug { eprintln!("  empty reading, ignoring"); }
+                                debug!("  empty reading, ignoring");
                             }
                             else {
                                 last_weight_data = Some(weight_data);
@@ -63,17 +64,13 @@ impl<'a> Scanner<'a> {
 
             if let Some(weight_data) = &last_weight_data {
                 if weight_data.done() || last_weight_data_seen.elapsed()? > Duration::new(30,0) {
-                    if self.cli.debug {
-                        eprintln!("  outputing weight data");
-                    }
+                    debug!("  outputing weight data");
 
                     weight_data.dump()?;
                     last_weight_data = None;
 
                     if self.cli.until_data {
-                        if self.cli.debug {
-                            eprintln!("  stopping as requested via params");
-                        }
+                        debug!("  stopping as requested via params");
                         break;
                     }
                 }
@@ -83,9 +80,7 @@ impl<'a> Scanner<'a> {
                 let elapsed = now.elapsed()?;
 
                 if elapsed.as_secs() > self.cli.duration {
-                    if self.cli.debug {
-                        eprintln!("  stopping as exceeding max duration defined via params");
-                    }
+                    debug!("  stopping as exceeding max duration defined via params");
                     break;
                 }
             }
@@ -98,6 +93,8 @@ impl<'a> Scanner<'a> {
 
     fn handle_signal(&self, signal: &dbus::Message) -> Result<Option<WeightData>, Box<dyn Error>> {
         let (message_type, path, interface, member) = signal.headers();
+
+        debug!("got signal message_type={:?}, path={:?}, interface={:?}, member={:?}", message_type, path, interface, member);
 
         if message_type == Signal
             && interface == Some("org.freedesktop.DBus.Properties".to_string())
@@ -127,23 +124,21 @@ impl<'a> Scanner<'a> {
         let name   = if let Some(name)   = properties.get("Name")    { name }   else { return Ok(None) };
         let uuids  = if let Some(uuids)  = properties.get("UUIDs")   { uuids }  else { return Ok(None) };
 
-        if self.cli.debug {
-            eprintln!("changed properties:");
-            eprintln!("  btaddr {:?}", btaddr);
-            eprintln!("  name   {:?}", name);
-            eprintln!("  uuids  {:?}", uuids);
-        }
+        debug!("changed properties:");
+        debug!("  btaddr {:?}", btaddr);
+        debug!("  name   {:?}", name);
+        debug!("  uuids  {:?}", uuids);
 
         match uuids.as_iter() {
             None => {
-                if self.cli.debug { eprintln!("  discarding - wrong type"); }
+                debug!("  discarding - wrong type");
 
                 return Ok(None);
             },
 
             Some(ref mut iter) => {
                 if !iter.any(|a| a.as_str() == Some(BODY_COMPOSITION_UUID)) {
-                    if self.cli.debug { eprintln!("  discarding due to missing uuid"); }
+                    debug!("  discarding due to missing uuid");
 
                     return Ok(None);
                 }
@@ -151,9 +146,7 @@ impl<'a> Scanner<'a> {
         }
 
         for item in item_vec {
-            if self.cli.debug {
-                eprintln!("    {:?}", item);
-            }
+            debug!("    {:?}", item);
 
             if let dbus::MessageItem::DictEntry(key, value) = item {
                 if let Some(btaddr_str) = (*btaddr).as_str() {
@@ -189,9 +182,7 @@ impl<'a> Scanner<'a> {
     ) -> Result<Option<WeightData>, Box<dyn Error>> {
         if let dbus::MessageItem::Str(key) = key {
             if key == "ServiceData" {
-                if self.cli.debug {
-                    eprintln!("  Got service data!");
-                }
+                debug!("  Got service data!");
 
                 if let dbus::MessageItem::Variant(value) = value {
                     return self.inquiry_service_data_values(value, btaddr);
@@ -209,9 +200,7 @@ impl<'a> Scanner<'a> {
         btaddr: &str,
     ) -> Result<Option<WeightData>, Box<dyn Error>> {
         if let dbus::MessageItem::Str(key) = key {
-            if self.cli.debug {
-                eprintln!("  service-data uuid : {:?}", key);
-            }
+            debug!("  service-data uuid : {:?}", key);
 
             if key != BODY_COMPOSITION_UUID {
                 return Ok(None);
@@ -228,7 +217,7 @@ impl<'a> Scanner<'a> {
                         .filter_map(|x| x.inner::<u8>().ok())
                         .collect();
 
-                    return Ok(Some(WeightData::decode(&bytes, btaddr, self.cli.debug)?));
+                    return Ok(Some(WeightData::decode(&bytes, btaddr)?));
                 }
             }
         }
